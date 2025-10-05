@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -39,7 +40,7 @@ func TestPostLongUrl(t *testing.T) {
 				method:  http.MethodGet,
 				body:    "https://practicum.yandex.ru/",
 			},
-			wantStatusCode: http.StatusBadRequest,
+			wantStatusCode: http.StatusMethodNotAllowed,
 		},
 		{
 			name: "#3 — пустое тело",
@@ -71,13 +72,16 @@ func TestPostLongUrl(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+
 			req := httptest.NewRequest(tt.args.method, "/", strings.NewReader(tt.args.body))
 			req.Header.Set("Content-Type", "text/plain")
 
-			w := httptest.NewRecorder()
+			c.Request = req
 
 			handler := PostLongUrl(tt.args.storage)
-			handler(w, req)
+			handler(c)
 
 			resp := w.Result()
 			body, _ := io.ReadAll(resp.Body)

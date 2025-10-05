@@ -2,7 +2,8 @@ package main
 
 import (
 	"log"
-	"net/http"
+
+	"github.com/gin-gonic/gin"
 
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/handler"
 )
@@ -10,15 +11,13 @@ import (
 var storage = make(map[string]string)
 
 func main() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", handler.PostLongUrl(storage))
-	mux.HandleFunc("/{id}", handler.GetIdUrl(storage))
-	if err := run(mux); err != nil {
+	r := gin.Default()
+
+	r.POST("/", handler.PostLongUrl(storage))
+	r.GET("/:id", handler.GetIdUrl(storage))
+
+	log.Println("server is running on port 8080")
+	if err := r.Run(":8080"); err != nil {
 		log.Panic(err)
 	}
-}
-
-func run(mux http.Handler) error {
-	log.Println("server is running on port 8080")
-	return http.ListenAndServe("localhost:8080", mux)
 }

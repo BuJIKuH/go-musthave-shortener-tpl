@@ -1,12 +1,11 @@
 package handler
 
 import (
-	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,7 +42,7 @@ func TestGetIdUrl(t *testing.T) {
 				method: http.MethodPost,
 				path:   "/sdasda",
 			},
-			wantStatusCode: http.StatusBadRequest,
+			wantStatusCode: http.StatusNotFound,
 		},
 		{
 			name: "#3 — пустое тело",
@@ -54,7 +53,7 @@ func TestGetIdUrl(t *testing.T) {
 				method: http.MethodGet,
 				path:   "/",
 			},
-			wantStatusCode: http.StatusBadRequest,
+			wantStatusCode: http.StatusNotFound,
 		},
 		{
 			name: "#4 — невалидный path",
@@ -70,21 +69,22 @@ func TestGetIdUrl(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(tt.args.method, tt.args.path, strings.NewReader(tt.args.path))
+			router := gin.New()
+			router.GET("/:id", GetIdUrl(tt.args.storage))
+
+			req := httptest.NewRequest(tt.args.method, tt.args.path, nil)
 			w := httptest.NewRecorder()
 
-			GetIdUrl(tt.args.storage)(w, req)
-			resp := w.Result()
+			router.ServeHTTP(w, req)
 
-			assert.Equal(t, tt.wantStatusCode, resp.StatusCode)
+			//GetIdUrl(tt.args.storage)(c)
+			//resp := w.Result()
+
+			assert.Equal(t, tt.wantStatusCode, w.Code, "unexpected status code")
 
 			if tt.wantUrl != "" {
-				assert.Equal(t, tt.wantUrl, resp.Header.Get("Location"))
+				assert.Equal(t, tt.wantUrl, w.Header().Get("Location"))
 			}
-
-			body, _ := io.ReadAll(resp.Body)
-			defer resp.Body.Close()
-			t.Logf("Response path: %s", strings.TrimSpace(string(body)))
 
 		})
 	}

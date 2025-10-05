@@ -2,54 +2,51 @@ package handler
 
 import (
 	"fmt"
-	"io"
-	"log"
 	"math/rand"
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
-func PostLongUrl(storage map[string]string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" || r.Method != http.MethodPost || r.Body == nil {
-			http.Error(w, "bad request", http.StatusBadRequest)
+func PostLongUrl(storage map[string]string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Method != http.MethodPost {
+			c.String(http.StatusMethodNotAllowed, http.StatusText(http.StatusMethodNotAllowed))
+		}
+		if c.GetHeader("Content-Type") != "text/plain" {
+			c.String(http.StatusBadRequest, "invalid content type")
 			return
 		}
 
-		body, err := io.ReadAll(r.Body)
-		defer r.Body.Close()
+		body, err := c.GetRawData()
 		if err != nil || len(body) == 0 {
-			http.Error(w, "empty path", http.StatusBadRequest)
+			c.String(http.StatusBadRequest, "empty body")
 			return
 		}
 
 		originalUrl := strings.TrimSpace(string(body))
-
 		u, err := url.ParseRequestURI(originalUrl)
-		log.Println(u)
 		if err != nil || u.Scheme == "" || u.Host == "" {
-			http.Error(w, "Invalid url", http.StatusBadRequest)
+			c.String(http.StatusBadRequest, "invalid url")
 			return
 		}
 
 		const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-		rand.Seed(time.Now().UnixNano())
 		b := make([]byte, 8)
 		for i := range b {
 			b[i] = letters[rand.Intn(len(letters))]
 		}
-		storage[string(b)] = originalUrl
+		id := string(b)
+		storage[id] = originalUrl
+		shortUrl := fmt.Sprintf("http://localhost:8080/%s", id)
 
-		shortUrl := fmt.Sprintf("http://localhost:8080/%s", string(b))
-		w.Header().Set("Content-Type", "text/plain")
-		w.Header().Set("Content-Length", fmt.Sprint(len(shortUrl)))
-		w.WriteHeader(http.StatusCreated)
+		// Добавляем заголовки
+		c.Header("Content-Type", "text/plain")
+		c.Header("Content-Length", fmt.Sprint(len(shortUrl)))
 
-		fmt.Fprint(w, shortUrl)
-
-		log.Println(originalUrl, string(b))
+		// Отправляем ответ
+		c.String(http.StatusCreated, shortUrl)
 	}
-
 }
