@@ -6,23 +6,33 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 )
 
 func PostLongUrl(storage map[string]string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" && r.Method != "POST" {
-			log.Println(w, "bad request", http.StatusBadRequest)
+		if r.URL.Path != "/" || r.Method != http.MethodPost || r.Body == nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
 
 		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			log.Println(err)
-		}
 		defer r.Body.Close()
+		if err != nil || len(body) == 0 {
+			http.Error(w, "empty path", http.StatusBadRequest)
+			return
+		}
 
-		originalUrl := string(body)
+		originalUrl := strings.TrimSpace(string(body))
+
+		u, err := url.ParseRequestURI(originalUrl)
+		log.Println(u)
+		if err != nil || u.Scheme == "" || u.Host == "" {
+			http.Error(w, "Invalid url", http.StatusBadRequest)
+			return
+		}
 
 		const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 		rand.Seed(time.Now().UnixNano())
