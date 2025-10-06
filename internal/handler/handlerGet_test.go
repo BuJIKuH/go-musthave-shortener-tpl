@@ -19,7 +19,7 @@ func TestGetIdUrl(t *testing.T) {
 		name           string
 		args           args
 		wantStatusCode int
-		wantUrl        string
+		wantURL        string
 	}{
 		{
 			name: "#1 - GET",
@@ -31,7 +31,7 @@ func TestGetIdUrl(t *testing.T) {
 				path:   "/sdasda",
 			},
 			wantStatusCode: http.StatusTemporaryRedirect,
-			wantUrl:        "https://practicum.yandex.ru/",
+			wantURL:        "https://practicum.yandex.ru/",
 		},
 		{
 			name: "#2 - unknown method",
@@ -82,8 +82,8 @@ func TestGetIdUrl(t *testing.T) {
 
 			assert.Equal(t, tt.wantStatusCode, w.Code, "unexpected status code")
 
-			if tt.wantUrl != "" {
-				assert.Equal(t, tt.wantUrl, w.Header().Get("Location"))
+			if tt.wantURL != "" {
+				assert.Equal(t, tt.wantURL, w.Header().Get("Location"))
 			}
 
 		})
