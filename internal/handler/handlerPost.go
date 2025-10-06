@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func PostLongUrl(storage map[string]string, shortUrl string) gin.HandlerFunc {
+func PostLongURL(storage map[string]string, shortURL string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.Request.Method != http.MethodPost {
 			c.String(http.StatusMethodNotAllowed, http.StatusText(http.StatusMethodNotAllowed))
@@ -26,8 +26,8 @@ func PostLongUrl(storage map[string]string, shortUrl string) gin.HandlerFunc {
 			return
 		}
 
-		originalUrl := strings.TrimSpace(string(body))
-		u, err := url.ParseRequestURI(originalUrl)
+		originalURL := strings.TrimSpace(string(body))
+		u, err := url.ParseRequestURI(originalURL)
 		if err != nil || u.Scheme == "" || u.Host == "" {
 			c.String(http.StatusBadRequest, "invalid url")
 			return
@@ -39,14 +39,14 @@ func PostLongUrl(storage map[string]string, shortUrl string) gin.HandlerFunc {
 			b[i] = letters[rand.Intn(len(letters))]
 		}
 		id := string(b)
-		storage[id] = originalUrl
-		shortUrl := fmt.Sprintf("%s/%s", shortUrl, id)
+		storage[id] = originalURL
+		finishURL := fmt.Sprintf("%s/%s", shortURL, id)
 
 		// Добавляем заголовки
 		c.Header("Content-Type", "text/plain")
-		c.Header("Content-Length", fmt.Sprint(len(shortUrl)))
+		c.Header("Content-Length", fmt.Sprint(len(finishURL)))
 
 		// Отправляем ответ
-		c.String(http.StatusCreated, shortUrl)
+		c.String(http.StatusCreated, finishURL)
 	}
 }

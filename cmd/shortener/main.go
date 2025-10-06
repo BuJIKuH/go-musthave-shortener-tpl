@@ -18,8 +18,8 @@ func main() {
 
 	r := gin.Default()
 
-	r.POST("/", handler.PostLongUrl(storage, cfg.ShortenAddress))
-	r.GET("/:id", handler.GetIdUrl(storage))
+	r.POST("/", handler.PostLongURL(storage, cfg.ShortenAddress))
+	r.GET("/:id", handler.GetIDURL(storage))
 
 	log.Println("server is running on port: ", cfg.ShortenAddress)
 	if err := r.Run(cfg.Address); err != nil {

@@ -70,14 +70,14 @@ func TestGetIdUrl(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			router := gin.New()
-			router.GET("/:id", GetIdUrl(tt.args.storage))
+			router.GET("/:id", GetIDURL(tt.args.storage))
 
 			req := httptest.NewRequest(tt.args.method, tt.args.path, nil)
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
 
-			//GetIdUrl(tt.args.storage)(c)
+			//GetIDURL(tt.args.storage)(c)
 			//resp := w.Result()
 
 			assert.Equal(t, tt.wantStatusCode, w.Code, "unexpected status code")

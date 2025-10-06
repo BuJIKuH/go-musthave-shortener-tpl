@@ -93,10 +93,11 @@ func TestPostLongUrl(t *testing.T) {
 
 			c.Request = req
 
-			handler := PostLongUrl(tt.args.storage, tt.args.shorten)
+			handler := PostLongURL(tt.args.storage, tt.args.shorten)
 			handler(c)
 
 			resp := w.Result()
+			defer resp.Body.Close()
 			body, _ := io.ReadAll(resp.Body)
 
 			gotBody := string(body)
