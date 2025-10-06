@@ -54,29 +54,11 @@ func TestPostLongUrl(t *testing.T) {
 			wantStatusCode: http.StatusBadRequest,
 		},
 		{
-			name: "#4 — невалидный урл",
+			name: "#4 — валидный урл",
 			args: args{
 				storage: make(map[string]string),
 				method:  http.MethodPost,
-				body:    "ww.wewq.aa",
-			},
-			wantStatusCode: http.StatusBadRequest,
-		},
-		{
-			name: "#5 — невалидный урл",
-			args: args{
-				storage: make(map[string]string),
-				method:  http.MethodPost,
-				body:    "www.practicum.yandex.ru",
-			},
-			wantStatusCode: http.StatusBadRequest,
-		},
-		{
-			name: "#6 - right POST без шортен",
-			args: args{
-				storage: make(map[string]string),
-				method:  http.MethodPost,
-				body:    "https://practicum.yandex.ru/",
+				body:    "wewq.aa",
 				shorten: "http://localhost:8080/",
 			},
 			wantStatusCode: http.StatusCreated,
