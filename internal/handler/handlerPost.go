@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func PostLongUrl(storage map[string]string) gin.HandlerFunc {
+func PostLongUrl(storage map[string]string, shortUrl string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.Request.Method != http.MethodPost {
 			c.String(http.StatusMethodNotAllowed, http.StatusText(http.StatusMethodNotAllowed))
@@ -40,7 +40,7 @@ func PostLongUrl(storage map[string]string) gin.HandlerFunc {
 		}
 		id := string(b)
 		storage[id] = originalUrl
-		shortUrl := fmt.Sprintf("http://localhost:8080/%s", id)
+		shortUrl := fmt.Sprintf("%s/%s", shortUrl, id)
 
 		// Добавляем заголовки
 		c.Header("Content-Type", "text/plain")

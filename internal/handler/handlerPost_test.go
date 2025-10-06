@@ -16,6 +16,7 @@ func TestPostLongUrl(t *testing.T) {
 		storage map[string]string
 		method  string
 		body    string
+		shorten string
 	}
 	tests := []struct {
 		name           string
@@ -29,9 +30,10 @@ func TestPostLongUrl(t *testing.T) {
 				storage: make(map[string]string),
 				method:  http.MethodPost,
 				body:    "https://practicum.yandex.ru/",
+				shorten: "https://lol/",
 			},
 			wantStatusCode: http.StatusCreated,
-			wantPrefix:     "http://localhost:8080/",
+			wantPrefix:     "https://lol/",
 		},
 		{
 			name: "#2 - unknown method",
@@ -69,6 +71,17 @@ func TestPostLongUrl(t *testing.T) {
 			},
 			wantStatusCode: http.StatusBadRequest,
 		},
+		{
+			name: "#6 - right POST без шортен",
+			args: args{
+				storage: make(map[string]string),
+				method:  http.MethodPost,
+				body:    "https://practicum.yandex.ru/",
+				shorten: "http://localhost:8080/",
+			},
+			wantStatusCode: http.StatusCreated,
+			wantPrefix:     "http://localhost:8080/",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -80,7 +93,7 @@ func TestPostLongUrl(t *testing.T) {
 
 			c.Request = req
 
-			handler := PostLongUrl(tt.args.storage)
+			handler := PostLongUrl(tt.args.storage, tt.args.shorten)
 			handler(c)
 
 			resp := w.Result()
