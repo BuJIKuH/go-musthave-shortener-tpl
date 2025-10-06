@@ -40,6 +40,9 @@ func PostLongURL(storage map[string]string, shortURL string) gin.HandlerFunc {
 		id := string(b)
 		storage[id] = originalURL
 		finishURL := fmt.Sprintf("%s/%s", strings.TrimRight(shortURL, "/"), id)
+		if !strings.HasPrefix(shortURL, "http://") && !strings.HasPrefix(finishURL, "https://") {
+			finishURL = "http://" + finishURL
+		}
 
 		// Добавляем заголовки
 		c.Header("Content-Type", "text/plain")
