@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -27,11 +26,11 @@ func PostLongURL(storage map[string]string, shortURL string) gin.HandlerFunc {
 		}
 
 		originalURL := strings.TrimSpace(string(body))
-		u, err := url.ParseRequestURI(originalURL)
-		if err != nil || u.Scheme == "" || u.Host == "" {
-			c.String(http.StatusBadRequest, "invalid url")
-			return
-		}
+		//u, err := url.ParseRequestURI(originalURL)
+		//if err != nil || u.Scheme == "" || u.Host == "" {
+		//	c.String(http.StatusBadRequest, "invalid url")
+		//	return
+		//}
 
 		const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 		b := make([]byte, 8)
