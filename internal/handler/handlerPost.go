@@ -40,7 +40,7 @@ func PostLongURL(storage map[string]string, shortURL string) gin.HandlerFunc {
 		}
 		id := string(b)
 		storage[id] = originalURL
-		finishURL := fmt.Sprintf("%s/%s", shortURL, id)
+		finishURL := fmt.Sprintf("%s/%s", strings.TrimRight(shortURL, "/"), id)
 
 		// Добавляем заголовки
 		c.Header("Content-Type", "text/plain")
