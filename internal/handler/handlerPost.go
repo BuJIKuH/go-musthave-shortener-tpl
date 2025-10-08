@@ -2,14 +2,19 @@ package handler
 
 import (
 	"fmt"
-	"math/rand"
 	"net/http"
 	"strings"
 
+	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/service/shortener"
 	"github.com/gin-gonic/gin"
 )
 
-func PostLongURL(storage map[string]string, shortURL string) gin.HandlerFunc {
+type Storage interface {
+	Save(id, url string)
+	Get(id string) (string, bool)
+}
+
+func PostLongURL(s Storage, shortURL string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.Request.Method != http.MethodPost {
 			c.String(http.StatusMethodNotAllowed, http.StatusText(http.StatusMethodNotAllowed))
@@ -26,19 +31,14 @@ func PostLongURL(storage map[string]string, shortURL string) gin.HandlerFunc {
 		}
 
 		originalURL := strings.TrimSpace(string(body))
-		//u, err := url.ParseRequestURI(originalURL)
-		//if err != nil || u.Scheme == "" || u.Host == "" {
-		//	c.String(http.StatusBadRequest, "invalid url")
-		//	return
-		//}
 
-		const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-		b := make([]byte, 8)
-		for i := range b {
-			b[i] = letters[rand.Intn(len(letters))]
+		id, err := shortener.GenerateID()
+		if err != nil {
+			c.String(http.StatusInternalServerError, "failed to generate id")
 		}
-		id := string(b)
-		storage[id] = originalURL
+
+		s.Save(id, originalURL)
+
 		finishURL := fmt.Sprintf("%s/%s", strings.TrimRight(shortURL, "/"), id)
 		if !strings.HasPrefix(shortURL, "http://") && !strings.HasPrefix(finishURL, "https://") {
 			finishURL = "http://" + finishURL

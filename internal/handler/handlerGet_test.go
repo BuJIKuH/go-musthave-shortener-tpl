@@ -5,13 +5,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config/db"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetIdUrl(t *testing.T) {
 	type args struct {
-		storage map[string]string
+		storage *db.InMemoryStorage
 		method  string
 		path    string
 	}
@@ -24,9 +25,11 @@ func TestGetIdUrl(t *testing.T) {
 		{
 			name: "#1 - GET",
 			args: args{
-				storage: map[string]string{
-					"sdasda": "https://practicum.yandex.ru/",
-				},
+				storage: func() *db.InMemoryStorage {
+					s := db.NewInMemoryStorage()
+					s.Save("sdasda", "https://practicum.yandex.ru/")
+					return s
+				}(),
 				method: http.MethodGet,
 				path:   "/sdasda",
 			},
@@ -36,9 +39,11 @@ func TestGetIdUrl(t *testing.T) {
 		{
 			name: "#2 - unknown method",
 			args: args{
-				storage: map[string]string{
-					"sdasda": "https://practicum.yandex.ru/",
-				},
+				storage: func() *db.InMemoryStorage {
+					s := db.NewInMemoryStorage()
+					s.Save("sdasda", "https://practicum.yandex.ru/")
+					return s
+				}(),
 				method: http.MethodPost,
 				path:   "/sdasda",
 			},
@@ -47,9 +52,11 @@ func TestGetIdUrl(t *testing.T) {
 		{
 			name: "#3 — пустое тело",
 			args: args{
-				storage: map[string]string{
-					"sdasda": "https://practicum.yandex.ru/",
-				},
+				storage: func() *db.InMemoryStorage {
+					s := db.NewInMemoryStorage()
+					s.Save("sdasda", "https://practicum.yandex.ru/")
+					return s
+				}(),
 				method: http.MethodGet,
 				path:   "/",
 			},
@@ -58,9 +65,11 @@ func TestGetIdUrl(t *testing.T) {
 		{
 			name: "#4 — невалидный path",
 			args: args{
-				storage: map[string]string{
-					"sdasda": "https://practicum.yandex.ru/",
-				},
+				storage: func() *db.InMemoryStorage {
+					s := db.NewInMemoryStorage()
+					s.Save("sdasda", "https://practicum.yandex.ru/")
+					return s
+				}(),
 				method: http.MethodGet,
 				path:   "/saasda",
 			},
