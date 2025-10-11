@@ -4,7 +4,7 @@ import (
 	"log"
 
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config"
-	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config/db"
+	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config/storage"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/handler"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/fx"
@@ -14,14 +14,14 @@ func main() {
 	fx.New(
 		fx.Provide(
 			config.InitConfig,
-			db.NewInMemoryStorage,
+			storage.NewInMemoryStorage,
 			newRouter,
 		),
 		fx.Invoke(startServer),
 	).Run()
 }
 
-func newRouter(cfg *config.Config, store *db.InMemoryStorage) *gin.Engine {
+func newRouter(cfg *config.Config, store *storage.InMemoryStorage) *gin.Engine {
 	r := gin.Default()
 	r.POST("/", handler.PostLongURL(store, cfg.ShortenAddress))
 	r.GET("/:id", handler.GetIDURL(store))

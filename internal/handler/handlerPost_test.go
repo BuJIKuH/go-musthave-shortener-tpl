@@ -7,14 +7,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config/db"
+	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestPostLongUrl(t *testing.T) {
 	type args struct {
-		storage *db.InMemoryStorage
+		storage *storage.InMemoryStorage
 		method  string
 		body    string
 		shorten string
@@ -28,7 +28,7 @@ func TestPostLongUrl(t *testing.T) {
 		{
 			name: "#1 - right POST",
 			args: args{
-				storage: db.NewInMemoryStorage(),
+				storage: storage.NewInMemoryStorage(),
 				method:  http.MethodPost,
 				body:    "https://practicum.yandex.ru/",
 				shorten: "https://lol/",
@@ -39,7 +39,7 @@ func TestPostLongUrl(t *testing.T) {
 		{
 			name: "#2 - unknown method",
 			args: args{
-				storage: db.NewInMemoryStorage(),
+				storage: storage.NewInMemoryStorage(),
 				method:  http.MethodGet,
 				body:    "https://practicum.yandex.ru/",
 			},
@@ -48,7 +48,7 @@ func TestPostLongUrl(t *testing.T) {
 		{
 			name: "#3 — пустое тело",
 			args: args{
-				storage: db.NewInMemoryStorage(),
+				storage: storage.NewInMemoryStorage(),
 				method:  http.MethodPost,
 				body:    "",
 			},
@@ -57,7 +57,7 @@ func TestPostLongUrl(t *testing.T) {
 		{
 			name: "#4 — валидный урл",
 			args: args{
-				storage: db.NewInMemoryStorage(),
+				storage: storage.NewInMemoryStorage(),
 				method:  http.MethodPost,
 				body:    "wewq.aa",
 				shorten: "http://localhost:8080/",
