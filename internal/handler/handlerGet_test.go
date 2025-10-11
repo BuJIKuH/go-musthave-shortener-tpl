@@ -86,9 +86,6 @@ func TestGetIdUrl(t *testing.T) {
 
 			router.ServeHTTP(w, req)
 
-			//GetIDURL(tt.args.storage)(c)
-			//resp := w.Result()
-
 			assert.Equal(t, tt.wantStatusCode, w.Code, "unexpected status code")
 
 			if tt.wantURL != "" {

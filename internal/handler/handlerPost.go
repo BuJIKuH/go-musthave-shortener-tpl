@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config"
+	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config/storage"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/service/shortener"
 	"github.com/gin-gonic/gin"
 )
 
-func PostLongURL(s config.Storage, shortURL string) gin.HandlerFunc {
+func PostLongURL(s storage.Storage, shortURL string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.Request.Method != http.MethodPost {
 			c.String(http.StatusMethodNotAllowed, http.StatusText(http.StatusMethodNotAllowed))
