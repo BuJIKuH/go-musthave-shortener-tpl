@@ -3,10 +3,11 @@ package handler
 import (
 	"net/http"
 
+	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config"
 	"github.com/gin-gonic/gin"
 )
 
-func GetIDURL(s Storage) gin.HandlerFunc {
+func GetIDURL(s config.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 

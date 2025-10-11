@@ -5,16 +5,12 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/service/shortener"
 	"github.com/gin-gonic/gin"
 )
 
-type Storage interface {
-	Save(id, url string)
-	Get(id string) (string, bool)
-}
-
-func PostLongURL(s Storage, shortURL string) gin.HandlerFunc {
+func PostLongURL(s config.Storage, shortURL string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.Request.Method != http.MethodPost {
 			c.String(http.StatusMethodNotAllowed, http.StatusText(http.StatusMethodNotAllowed))
@@ -35,6 +31,7 @@ func PostLongURL(s Storage, shortURL string) gin.HandlerFunc {
 		id, err := shortener.GenerateID()
 		if err != nil {
 			c.String(http.StatusInternalServerError, "failed to generate id")
+			return
 		}
 
 		s.Save(id, originalURL)
@@ -44,11 +41,9 @@ func PostLongURL(s Storage, shortURL string) gin.HandlerFunc {
 			finishURL = "http://" + finishURL
 		}
 
-		// Добавляем заголовки
 		c.Header("Content-Type", "text/plain")
 		c.Header("Content-Length", fmt.Sprint(len(finishURL)))
 
-		// Отправляем ответ
 		c.String(http.StatusCreated, finishURL)
 	}
 }

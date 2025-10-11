@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config/config"
+	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config/db"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/handler"
 	"github.com/gin-gonic/gin"

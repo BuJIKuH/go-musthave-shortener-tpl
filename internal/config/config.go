@@ -5,6 +5,11 @@ import (
 	"fmt"
 )
 
+type Storage interface {
+	Save(id, url string)
+	Get(id string) (string, bool)
+}
+
 type Config struct {
 	Address        string
 	ShortenAddress string
