@@ -21,20 +21,16 @@ func InitConfig() *Config {
 	var cfg Config
 	_ = godotenv.Load()
 
-	// Значения по умолчанию
 	defaultAddr := "localhost:8080"
 	defaultBase := "http://localhost:8080"
 
-	// Определяем флаги
 	flag.StringVar(&cfg.Address, "a", "", "Address to listen on")
 	flag.StringVar(&cfg.ShortenAddress, "b", "", "Base URL for shortened links")
 	flag.Parse()
 
-	// Читаем переменные окружения
 	envAddress := os.Getenv("SERVER_ADDRESS")
 	envBaseURL := os.Getenv("BASE_URL")
 
-	// Приоритет: ENV > FLAG > DEFAULT
 	if envAddress != "" {
 		cfg.Address = envAddress
 	} else if cfg.Address == "" {
