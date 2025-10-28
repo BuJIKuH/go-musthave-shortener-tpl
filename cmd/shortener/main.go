@@ -37,8 +37,9 @@ func newRouter(cfg *config.Config, store *storage.InMemoryStorage, logger *zap.L
 	r := gin.New()
 	r.Use(middleware.Logger(logger))
 
-	r.POST("/", handler.PostLongURL(store, cfg.ShortenAddress))
+	r.POST("/", handler.PostRawURL(store, cfg.ShortenAddress))
 	r.GET("/:id", handler.GetIDURL(store))
+	r.POST("/api/shorten", handler.PostJsonURL(store, cfg.ShortenAddress))
 	return r
 }
 

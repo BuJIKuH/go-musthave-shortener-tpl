@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -10,7 +11,47 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func PostLongURL(s storage.Storage, shortURL string) gin.HandlerFunc {
+type RequestJSON struct {
+	URL string `json:"url"`
+}
+
+type ResponseJSON struct {
+	Result string `json:"result"`
+}
+
+func PostJsonURL(s storage.Storage, baseURL string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Method != http.MethodPost {
+			c.JSON(http.StatusMethodNotAllowed, gin.H{"error": http.StatusText(http.StatusMethodNotAllowed)})
+			return
+		}
+
+		var req RequestJSON
+		if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if req.URL == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "url is required"})
+			return
+		}
+
+		id, err := shortener.GenerateID()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		s.Save(id, req.URL)
+
+		shortURL := baseURL + "/" + id
+
+		c.Header("Content-Type", "application/json")
+		c.JSON(http.StatusCreated, ResponseJSON{shortURL})
+	}
+}
+
+func PostRawURL(s storage.Storage, shortURL string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.Request.Method != http.MethodPost {
 			c.String(http.StatusMethodNotAllowed, http.StatusText(http.StatusMethodNotAllowed))
