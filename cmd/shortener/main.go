@@ -35,7 +35,10 @@ func NewLogger() (*zap.Logger, error) {
 
 func newRouter(cfg *config.Config, store *storage.InMemoryStorage, logger *zap.Logger) *gin.Engine {
 	r := gin.New()
-	r.Use(middleware.Logger(logger))
+	r.Use(
+		middleware.Logger(logger),
+		middleware.GzipMiddleware(logger),
+	)
 
 	r.POST("/", handler.PostRawURL(store, cfg.ShortenAddress))
 	r.GET("/:id", handler.GetIDURL(store))
