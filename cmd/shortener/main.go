@@ -42,7 +42,7 @@ func newRouter(cfg *config.Config, store *storage.InMemoryStorage, logger *zap.L
 
 	r.POST("/", handler.PostRawURL(store, cfg.ShortenAddress))
 	r.GET("/:id", handler.GetIDURL(store))
-	r.POST("/api/shorten", handler.PostJsonURL(store, cfg.ShortenAddress))
+	r.POST("/api/shorten", handler.PostJSONURL(store, cfg.ShortenAddress))
 	return r
 }
 
