@@ -140,7 +140,7 @@ func TestPostJsonURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewInMemoryStorage()
 			router := gin.Default()
-			router.POST("/api/shorten", PostJsonURL(store, "http://localhost:8080"))
+			router.POST("/api/shorten", PostJSONURL(store, "http://localhost:8080"))
 
 			var reqBody *bytes.Reader
 			if tt.args.body != nil {

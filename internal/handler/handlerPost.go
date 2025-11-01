@@ -19,7 +19,7 @@ type ResponseJSON struct {
 	Result string `json:"result"`
 }
 
-func PostJsonURL(s storage.Storage, baseURL string) gin.HandlerFunc {
+func PostJSONURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.Request.Method != http.MethodPost {
 			c.JSON(http.StatusMethodNotAllowed, gin.H{"error": http.StatusText(http.StatusMethodNotAllowed)})
