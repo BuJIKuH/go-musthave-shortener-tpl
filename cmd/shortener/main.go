@@ -16,7 +16,7 @@ func main() {
 	fx.New(
 		fx.Provide(
 			config.InitConfig,
-			storage.NewInMemoryStorage,
+			newStorage,
 			newRouter,
 			NewLogger,
 		),
@@ -33,7 +33,16 @@ func NewLogger() (*zap.Logger, error) {
 	return logger, nil
 }
 
-func newRouter(cfg *config.Config, store *storage.InMemoryStorage, logger *zap.Logger) *gin.Engine {
+func newStorage(cfg *config.Config, logger *zap.Logger) (storage.Storage, error) {
+	if cfg.FileStoragePath != "" {
+		logger.Info("Using file storage", zap.String("path", cfg.FileStoragePath))
+		return storage.NewFileStorage(cfg.FileStoragePath, logger)
+	}
+	logger.Info("Using in-memory storage")
+	return storage.NewInMemoryStorage(), nil
+}
+
+func newRouter(cfg *config.Config, store storage.Storage, logger *zap.Logger) *gin.Engine {
 	r := gin.New()
 	r.Use(
 		middleware.Logger(logger),
