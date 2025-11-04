@@ -91,6 +91,7 @@ func (fs *FileStorage) load() error {
 			fs.nextID = rec.UUID
 		}
 	}
+
 	return scanner.Err()
 }
 
