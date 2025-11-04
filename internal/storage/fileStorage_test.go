@@ -105,7 +105,7 @@ func TestFileStorage(t *testing.T) {
 		scanner := bufio.NewScanner(file)
 		lineCount := 0
 		for scanner.Scan() {
-			var rec storage.Record
+			var rec storage.ShortURLRecord
 			err := json.Unmarshal(scanner.Bytes(), &rec)
 			assert.NoError(t, err)
 			assert.NotEmpty(t, rec.ShortURL)

@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type Record struct {
+type ShortURLRecord struct {
 	UUID        int    `json:"uuid"`
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
@@ -53,7 +53,7 @@ func (fs *FileStorage) Save(id, url string) {
 	fs.nextID++
 	fs.data[id] = url
 
-	rec := Record{
+	rec := ShortURLRecord{
 		UUID:        fs.nextID,
 		ShortURL:    id,
 		OriginalURL: url,
@@ -81,7 +81,7 @@ func (fs *FileStorage) Get(id string) (string, bool) {
 func (fs *FileStorage) load() error {
 	scanner := bufio.NewScanner(fs.file)
 	for scanner.Scan() {
-		var rec Record
+		var rec ShortURLRecord
 		if err := json.Unmarshal(scanner.Bytes(), &rec); err != nil {
 			fs.logger.Warn("invalid record", zap.String("line", scanner.Text()), zap.Error(err))
 			continue
