@@ -12,27 +12,20 @@ import (
 
 type gzipWriter struct {
 	gin.ResponseWriter
-	Writer io.Writer
+	gz *gzip.Writer
 }
 
 func (g *gzipWriter) Write(data []byte) (int, error) {
-	return g.Writer.Write(data)
+	if g.gz != nil {
+		return g.gz.Write(data)
+	}
+	return g.ResponseWriter.Write(data)
 }
 
 func GzipMiddleware(logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var gz *gzip.Writer
 		var gr *gzip.Reader
-		defer func() {
-			if gz != nil {
-				gz.Close()
-			}
-			if gr != nil {
-				gr.Close()
-			}
-		}()
 
-		// ---------- 1. Распаковка gzip-запроса ----------
 		if strings.Contains(c.GetHeader("Content-Encoding"), "gzip") {
 			reader, err := gzip.NewReader(c.Request.Body)
 			if err != nil {
@@ -42,30 +35,41 @@ func GzipMiddleware(logger *zap.Logger) gin.HandlerFunc {
 				return
 			}
 			gr = reader
-			c.Request.Body = gr
+			c.Request.Body = io.NopCloser(gr)
 
 			logger.Info("Decompressed incoming request",
 				zap.String("path", c.Request.URL.Path),
 				zap.String("method", c.Request.Method))
 		}
 
-		// ---------- 2. Сжатие ответа ----------
 		accept := c.GetHeader("Accept-Encoding")
-		contentType := c.GetHeader("Content-Type")
+		shouldCompress := strings.Contains(accept, "gzip")
 
-		if strings.Contains(accept, "gzip") &&
+		gzw := &gzipWriter{ResponseWriter: c.Writer}
+		c.Writer = gzw
+
+		c.Next()
+
+		contentType := c.Writer.Header().Get("Content-Type")
+		if shouldCompress &&
 			(strings.Contains(contentType, "application/json") ||
 				strings.Contains(contentType, "text/html")) {
 
-			c.Header("Content-Encoding", "gzip")
-			gz = gzip.NewWriter(c.Writer)
-			c.Writer = &gzipWriter{ResponseWriter: c.Writer, Writer: gz}
+			c.Writer.Header().Set("Content-Encoding", "gzip")
+			c.Writer.Header().Del("Content-Length") // длина меняется
+
+			gz := gzip.NewWriter(c.Writer)
+			defer gz.Close()
+
+			gzw.gz = gz
 
 			logger.Info("Enabled gzip compression for response",
 				zap.String("path", c.Request.URL.Path),
 				zap.String("method", c.Request.Method))
 		}
 
-		c.Next()
+		if gr != nil {
+			_ = gr.Close()
+		}
 	}
 }
