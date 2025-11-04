@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config/storage"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/service/shortener"
+	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/storage"
 	"github.com/gin-gonic/gin"
 )
 

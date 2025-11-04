@@ -4,9 +4,9 @@ import (
 	"log"
 
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config"
-	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config/storage"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/handler"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/middleware"
+	storage2 "github.com/BuJIKuH/go-musthave-shortener-tpl/internal/storage"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -33,16 +33,16 @@ func NewLogger() (*zap.Logger, error) {
 	return logger, nil
 }
 
-func newStorage(cfg *config.Config, logger *zap.Logger) (storage.Storage, error) {
+func newStorage(cfg *config.Config, logger *zap.Logger) (storage2.Storage, error) {
 	if cfg.FileStoragePath != "" {
 		logger.Info("Using file storage", zap.String("path", cfg.FileStoragePath))
-		return storage.NewFileStorage(cfg.FileStoragePath, logger)
+		return storage2.NewFileStorage(cfg.FileStoragePath, logger)
 	}
 	logger.Info("Using in-memory storage")
-	return storage.NewInMemoryStorage(), nil
+	return storage2.NewInMemoryStorage(), nil
 }
 
-func newRouter(cfg *config.Config, store storage.Storage, logger *zap.Logger) *gin.Engine {
+func newRouter(cfg *config.Config, store storage2.Storage, logger *zap.Logger) *gin.Engine {
 	r := gin.New()
 	r.Use(
 		middleware.Logger(logger),
