@@ -1,7 +1,11 @@
-package db
+package storage
 
 import "sync"
 
+type Storage interface {
+	Save(id, url string)
+	Get(id string) (string, bool)
+}
 type InMemoryStorage struct {
 	mu   sync.RWMutex
 	data map[string]string

@@ -1,20 +1,51 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/service/shortener"
+	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/storage"
 	"github.com/gin-gonic/gin"
 )
 
-func PostLongURL(s config.Storage, shortURL string) gin.HandlerFunc {
+type RequestJSON struct {
+	URL string `json:"url"`
+}
+
+type ResponseJSON struct {
+	Result string `json:"result"`
+}
+
+func PostJSONURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if c.Request.Method != http.MethodPost {
-			c.String(http.StatusMethodNotAllowed, http.StatusText(http.StatusMethodNotAllowed))
+		var req RequestJSON
+		if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+			return
 		}
+		if strings.TrimSpace(req.URL) == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "url is required"})
+			return
+		}
+
+		id, err := shortener.GenerateID()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate short id"})
+			return
+		}
+
+		s.Save(id, req.URL)
+
+		shortURL := fmt.Sprintf("%s/%s", strings.TrimRight(baseURL, "/"), id)
+		c.JSON(http.StatusCreated, ResponseJSON{Result: shortURL})
+	}
+}
+
+func PostRawURL(s storage.Storage, baseURL string) gin.HandlerFunc {
+	return func(c *gin.Context) {
 		if c.GetHeader("Content-Type") != "text/plain" {
 			c.String(http.StatusBadRequest, "invalid content type")
 			return
@@ -27,7 +58,6 @@ func PostLongURL(s config.Storage, shortURL string) gin.HandlerFunc {
 		}
 
 		originalURL := strings.TrimSpace(string(body))
-
 		id, err := shortener.GenerateID()
 		if err != nil {
 			c.String(http.StatusInternalServerError, "failed to generate id")
@@ -36,14 +66,7 @@ func PostLongURL(s config.Storage, shortURL string) gin.HandlerFunc {
 
 		s.Save(id, originalURL)
 
-		finishURL := fmt.Sprintf("%s/%s", strings.TrimRight(shortURL, "/"), id)
-		if !strings.HasPrefix(shortURL, "http://") && !strings.HasPrefix(finishURL, "https://") {
-			finishURL = "http://" + finishURL
-		}
-
-		c.Header("Content-Type", "text/plain")
-		c.Header("Content-Length", fmt.Sprint(len(finishURL)))
-
-		c.String(http.StatusCreated, finishURL)
+		shortURL := fmt.Sprintf("%s/%s", strings.TrimRight(baseURL, "/"), id)
+		c.String(http.StatusCreated, shortURL)
 	}
 }
