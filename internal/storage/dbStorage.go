@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"time"
 
@@ -52,9 +51,6 @@ func (s *DBStorage) Get(id string) (string, bool) {
 	query := `SELECT original_url FROM urls WHERE short_url = $1`
 	var original string
 	err := s.db.QueryRowContext(ctx, query, id).Scan(&original)
-	if errors.Is(sql.ErrNoRows, err) {
-		return "", false
-	}
 	if err != nil {
 		s.logger.Error("Failed to get record from DB", zap.Error(err))
 		return "", false
