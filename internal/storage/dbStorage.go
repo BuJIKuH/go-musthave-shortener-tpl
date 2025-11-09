@@ -18,14 +18,14 @@ type DBStorage struct {
 func NewDBStorage(dsn string, logger *zap.Logger) (*DBStorage, error) {
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		return nil, fmt.Errorf("cannot open DB: %w", err)
+		return nil, fmt.Errorf("сannot open DB: %w", err)
 	}
 
 	if err = db.Ping(); err != nil {
 		return nil, fmt.Errorf("cannot connect to DB: %w", err)
 	}
 
-	logger.Info("Connected to PostgreSQL")
+	logger.Info("Connected to PostgreSQL successfully")
 
 	return &DBStorage{
 		db:     db,
