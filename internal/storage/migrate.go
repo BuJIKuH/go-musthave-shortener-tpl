@@ -2,11 +2,10 @@ package storage
 
 import (
 	"database/sql"
-	"fmt"
 	"path/filepath"
 
 	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
 	"go.uber.org/zap"
@@ -20,17 +19,18 @@ func RunMigrations(dns string, logger *zap.Logger) error {
 	}
 	defer db.Close()
 
-	driver, err := postgres.WithInstance(db, &postgres.Config{})
+	path, err := filepath.Abs("internal/storage/migrations")
 	if err != nil {
-		logger.Info("cannot create postgres driver", zap.Error(err))
+		logger.Error("failed to get absolute path", zap.Error(err))
 		return err
 	}
 
-	migrationsPath, _ := filepath.Abs("internal/storage/migrations")
-	m, err := migrate.NewWithDatabaseInstance(
-		fmt.Sprintf("file://%s", migrationsPath), "postgres", driver)
+	migrationsURL := "file://" + path
+	logger.Info("Running migrations", zap.String("path", migrationsURL))
+
+	m, err := migrate.New(migrationsURL, dns)
 	if err != nil {
-		logger.Info("cannot create migration", zap.Error(err))
+		logger.Error("cannot create migration", zap.Error(err))
 		return err
 	}
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
