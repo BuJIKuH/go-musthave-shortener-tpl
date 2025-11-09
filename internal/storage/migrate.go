@@ -26,7 +26,7 @@ func RunMigrations(dns string, logger *zap.Logger) error {
 		return err
 	}
 
-	migrationsPath, _ := filepath.Abs("./internal/storage/migrations")
+	migrationsPath, _ := filepath.Abs("internal/storage/migrations")
 	m, err := migrate.NewWithDatabaseInstance(
 		fmt.Sprintf("file://%s", migrationsPath), "postgres", driver)
 	if err != nil {
