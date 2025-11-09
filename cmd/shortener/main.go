@@ -36,6 +36,10 @@ func NewLogger() (*zap.Logger, error) {
 
 func newStorage(cfg *config.Config, logger *zap.Logger) (storage.Storage, error) {
 	if cfg.DatabaseDSN != "" {
+		if err := storage.RunMigrations(cfg.DatabaseDSN, logger); err != nil {
+			logger.Error("can't initialize database migrations", zap.Error(err))
+		}
+
 		dbStore, err := storage.NewDBStorage(cfg.DatabaseDSN, logger)
 		if err == nil {
 			logger.Info("Using PostgreSQL storage")
