@@ -67,6 +67,7 @@ func newRouter(cfg *config.Config, store storage.Storage, logger *zap.Logger) *g
 	r.GET("/:id", handler.GetIDURL(store))
 	r.POST("/api/shorten", handler.PostJSONURL(store, cfg.ShortenAddress))
 	r.GET("/ping", handler.PingHandler(store))
+	r.POST("/api/shorten/batch", handler.PostBatchURL(store, cfg.ShortenAddress))
 	return r
 }
 

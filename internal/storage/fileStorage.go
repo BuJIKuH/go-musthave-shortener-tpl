@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -44,6 +45,34 @@ func NewFileStorage(path string, logger *zap.Logger) (*FileStorage, error) {
 
 	logger.Info("File storage initialized", zap.String("path", path), zap.Int("count", len(fs.data)))
 	return fs, nil
+}
+
+func (fs *FileStorage) SaveBatch(ctx context.Context, batch map[string]string) error {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+
+	for id, url := range batch {
+		fs.nextID++
+		fs.data[id] = url
+
+		rec := ShortURLRecord{
+			UUID:        fs.nextID,
+			ShortURL:    id,
+			OriginalURL: url,
+		}
+
+		bytes, err := json.Marshal(rec)
+		if err != nil {
+			fs.logger.Error("Failed to marshal record", zap.Error(err))
+			continue
+		}
+		if _, err := fs.file.Write(append(bytes, '\n')); err != nil {
+			fs.logger.Error("Failed to append record to file", zap.Error(err))
+			continue
+		}
+	}
+
+	return nil
 }
 
 func (fs *FileStorage) Save(id, url string) {

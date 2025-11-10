@@ -14,6 +14,85 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestPostBatchURL(t *testing.T) {
+	type batchItem struct {
+		CorrelationID string `json:"correlation_id"`
+		OriginalURL   string `json:"original_url"`
+	}
+
+	tests := []struct {
+		name           string
+		method         string
+		body           any
+		wantStatusCode int
+		wantContent    string
+	}{
+		{
+			name:   "Valid batch request",
+			method: http.MethodPost,
+			body: []batchItem{
+				{CorrelationID: "1", OriginalURL: "https://example.com"},
+				{CorrelationID: "2", OriginalURL: "https://openai.com"},
+			},
+			wantStatusCode: http.StatusCreated,
+			wantContent:    `"short_url":"http://localhost:8080/`,
+		},
+		{
+			name:           "Empty array",
+			method:         http.MethodPost,
+			body:           []batchItem{},
+			wantStatusCode: http.StatusBadRequest,
+		},
+		{
+			name:           "Invalid JSON",
+			method:         http.MethodPost,
+			body:           `invalid_json`,
+			wantStatusCode: http.StatusBadRequest,
+		},
+		{
+			name:           "Wrong HTTP method",
+			method:         http.MethodGet,
+			body:           nil,
+			wantStatusCode: http.StatusNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := storage.NewInMemoryStorage()
+			router := gin.Default()
+			router.POST("/api/shorten/batch", PostBatchURL(store, "http://localhost:8080"))
+
+			var reqBody *bytes.Reader
+			switch b := tt.body.(type) {
+			case string:
+				reqBody = bytes.NewReader([]byte(b))
+			case []batchItem:
+				jsonBytes, _ := json.Marshal(b)
+				reqBody = bytes.NewReader(jsonBytes)
+			default:
+				reqBody = bytes.NewReader(nil)
+			}
+
+			req := httptest.NewRequest(tt.method, "/api/shorten/batch", reqBody)
+			req.Header.Set("Content-Type", "application/json")
+
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			resp := w.Result()
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.wantStatusCode, resp.StatusCode, "unexpected status code")
+
+			if tt.wantContent != "" {
+				bodyBytes, _ := io.ReadAll(resp.Body)
+				assert.Contains(t, string(bodyBytes), tt.wantContent, "response should contain shortened URL")
+			}
+		})
+	}
+}
+
 func TestPostLongUrl(t *testing.T) {
 	tests := []struct {
 		name           string

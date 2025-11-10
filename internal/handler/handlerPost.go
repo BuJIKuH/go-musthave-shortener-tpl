@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/service/shortener"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/storage"
@@ -17,6 +19,61 @@ type RequestJSON struct {
 
 type ResponseJSON struct {
 	Result string `json:"result"`
+}
+
+type BatchRequestItem struct {
+	CorrelationID string `json:"correlation_id"`
+	OriginalURL   string `json:"original_url"`
+}
+
+type BatchResponseItem struct {
+	CorrelationID string `json:"correlation_id"`
+	ShortURL      string `json:"short_url"`
+}
+
+func PostBatchURL(s storage.Storage, baseURL string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+		defer cancel()
+
+		var req []BatchRequestItem
+		if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		if len(req) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "empty body"})
+			return
+		}
+
+		batch := make(map[string]string)
+		resp := make([]BatchResponseItem, 0, len(req))
+
+		for _, item := range req {
+			if strings.TrimSpace(item.OriginalURL) == "" {
+				continue
+			}
+
+			id, err := shortener.GenerateID()
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate short id"})
+				return
+			}
+
+			batch[id] = item.OriginalURL
+			shortURL := fmt.Sprintf("%s/%s", strings.TrimRight(baseURL, "/"), id)
+			resp = append(resp, BatchResponseItem{
+				CorrelationID: item.CorrelationID,
+				ShortURL:      shortURL,
+			})
+		}
+		if err := s.SaveBatch(ctx, batch); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save batch"})
+			return
+		}
+		c.JSON(http.StatusCreated, resp)
+	}
 }
 
 func PostJSONURL(s storage.Storage, baseURL string) gin.HandlerFunc {

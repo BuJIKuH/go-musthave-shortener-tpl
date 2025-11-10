@@ -33,6 +33,41 @@ func NewDBStorage(dsn string, logger *zap.Logger) (*DBStorage, error) {
 	}, nil
 }
 
+func (s *DBStorage) SaveBatch(ctx context.Context, batch map[string]string) error {
+	if len(batch) == 0 {
+		return nil
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		s.logger.Error("failed to start transaction", zap.Error(err))
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx,
+		`INSERT INTO urls (short_url, original_url) VALUES ($1, $2)`)
+	if err != nil {
+		_ = tx.Rollback()
+		s.logger.Error("failed to prepare statement", zap.Error(err))
+		return err
+	}
+
+	for id, url := range batch {
+		if _, err := stmt.ExecContext(ctx, id, url); err != nil {
+			_ = tx.Rollback()
+			s.logger.Error("failed to insert row", zap.Error(err))
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		s.logger.Error("failed to commit transaction", zap.Error(err))
+		return err
+	}
+	s.logger.Info("Committed transaction")
+	return nil
+}
+
 func (s *DBStorage) Save(id, url string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()

@@ -1,10 +1,14 @@
 package storage
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
 type Storage interface {
 	Save(id, url string)
 	Get(id string) (string, bool)
+	SaveBatch(ctx context.Context, batch map[string]string) error
 }
 type InMemoryStorage struct {
 	mu   sync.RWMutex
@@ -15,6 +19,15 @@ func NewInMemoryStorage() *InMemoryStorage {
 	return &InMemoryStorage{
 		data: make(map[string]string),
 	}
+}
+
+func (s *InMemoryStorage) SaveBatch(ctx context.Context, batch map[string]string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for id, url := range batch {
+		s.data[id] = url
+	}
+	return nil
 }
 
 func (s *InMemoryStorage) Save(id, url string) {
