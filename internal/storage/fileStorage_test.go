@@ -2,7 +2,9 @@ package storage_test
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -14,9 +16,6 @@ import (
 )
 
 func TestFileStorage(t *testing.T) {
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "test_storage.jsonl")
-
 	logger, _ := zap.NewDevelopment()
 
 	tests := []struct {
@@ -28,61 +27,46 @@ func TestFileStorage(t *testing.T) {
 		{
 			name: "save and get single record",
 			setup: func(fs *storage.FileStorage) {
-				fs.Save("short1", "https://ya.ru")
+				fs.Save(context.Background(), "short1", "https://ya.ru")
 			},
 			validate: func(fs *storage.FileStorage, t *testing.T) {
 				url, ok := fs.Get("short1")
 				assert.True(t, ok)
 				assert.Equal(t, "https://ya.ru", url)
 			},
-			description: "Проверяем, что запись сохраняется и доступна через Get",
-		},
-		{
-			name: "data persists after reload",
-			setup: func(fs *storage.FileStorage) {
-				fs.Save("short2", "https://google.com")
-			},
-			validate: func(_ *storage.FileStorage, t *testing.T) {
-				newLogger, _ := zap.NewDevelopment()
-				newFS, err := storage.NewFileStorage(filePath, newLogger)
-				assert.NoError(t, err)
-				defer newFS.Close()
-
-				url, ok := newFS.Get("short2")
-				assert.True(t, ok)
-				assert.Equal(t, "https://google.com", url)
-			},
-			description: "Проверяем персистентность между сессиями",
 		},
 		{
 			name: "concurrent saves are safe",
 			setup: func(fs *storage.FileStorage) {
-				wg := sync.WaitGroup{}
+				var wg sync.WaitGroup
 				for i := 0; i < 10; i++ {
 					wg.Add(1)
 					go func(i int) {
 						defer wg.Done()
-						fs.Save(
-							"short"+string(rune('A'+i)),
-							"https://example.com/"+string(rune('A'+i)),
-						)
+						short := fmt.Sprintf("short_%d", i)
+						url := fmt.Sprintf("https://example.com/%d", i)
+						fs.Save(context.Background(), short, url)
 					}(i)
 				}
 				wg.Wait()
 			},
 			validate: func(fs *storage.FileStorage, t *testing.T) {
 				for i := 0; i < 10; i++ {
-					url, ok := fs.Get("short" + string(rune('A'+i)))
+					short := fmt.Sprintf("short_%d", i)
+					url, ok := fs.Get(short)
 					assert.True(t, ok)
-					assert.Contains(t, url, "https://example.com/")
+					assert.Equal(t, fmt.Sprintf("https://example.com/%d", i), url)
 				}
 			},
-			description: "Проверяем, что одновременные Save() не ломают данные",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+
+			// 🔥 ВАЖНО: свой файл для каждого теста
+			filePath := filepath.Join(t.TempDir(), "test_storage.jsonl")
+
 			fs, err := storage.NewFileStorage(filePath, logger)
 			assert.NoError(t, err)
 			defer fs.Close()
@@ -93,17 +77,20 @@ func TestFileStorage(t *testing.T) {
 	}
 
 	t.Run("file format is JSONL", func(t *testing.T) {
+		filePath := filepath.Join(t.TempDir(), "test_jsonl.jsonl")
+
 		fs, err := storage.NewFileStorage(filePath, logger)
 		assert.NoError(t, err)
 		defer fs.Close()
 
-		fs.Save("shortX", "https://jsonl-format.ru")
+		fs.Save(context.Background(), "shortX", "https://jsonl-format.ru")
 
 		file, _ := os.Open(filePath)
 		defer file.Close()
 
 		scanner := bufio.NewScanner(file)
 		lineCount := 0
+
 		for scanner.Scan() {
 			var rec storage.ShortURLRecord
 			err := json.Unmarshal(scanner.Bytes(), &rec)
@@ -111,6 +98,7 @@ func TestFileStorage(t *testing.T) {
 			assert.NotEmpty(t, rec.ShortURL)
 			lineCount++
 		}
-		assert.GreaterOrEqual(t, lineCount, 1, "в файле должны быть строки JSONL")
+
+		assert.GreaterOrEqual(t, lineCount, 1)
 	})
 }

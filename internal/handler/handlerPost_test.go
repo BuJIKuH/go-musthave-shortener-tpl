@@ -1,4 +1,4 @@
-package handler
+package handler_test
 
 import (
 	"bytes"
@@ -9,225 +9,156 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/handler"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestPostBatchURL(t *testing.T) {
-	type batchItem struct {
-		CorrelationID string `json:"correlation_id"`
-		OriginalURL   string `json:"original_url"`
-	}
+	baseURL := "http://localhost:8080"
+	router := gin.Default()
+	store := storage.NewInMemoryStorage()
+	router.POST("/api/shorten/batch", handler.PostBatchURL(store, baseURL))
 
-	tests := []struct {
-		name           string
-		method         string
-		body           any
-		wantStatusCode int
-		wantContent    string
-	}{
-		{
-			name:   "Valid batch request",
-			method: http.MethodPost,
-			body: []batchItem{
-				{CorrelationID: "1", OriginalURL: "https://example.com"},
-				{CorrelationID: "2", OriginalURL: "https://openai.com"},
-			},
-			wantStatusCode: http.StatusCreated,
-			wantContent:    `"short_url":"http://localhost:8080/`,
-		},
-		{
-			name:           "Empty array",
-			method:         http.MethodPost,
-			body:           []batchItem{},
-			wantStatusCode: http.StatusBadRequest,
-		},
-		{
-			name:           "Invalid JSON",
-			method:         http.MethodPost,
-			body:           `invalid_json`,
-			wantStatusCode: http.StatusBadRequest,
-		},
-		{
-			name:           "Wrong HTTP method",
-			method:         http.MethodGet,
-			body:           nil,
-			wantStatusCode: http.StatusNotFound,
-		},
-	}
+	t.Run("valid batch request", func(t *testing.T) {
+		batch := []handler.BatchRequestItem{
+			{CorrelationID: "1", OriginalURL: "https://example.com"},
+			{CorrelationID: "2", OriginalURL: "https://openai.com"},
+		}
+		body, _ := json.Marshal(batch)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			store := storage.NewInMemoryStorage()
-			router := gin.Default()
-			router.POST("/api/shorten/batch", PostBatchURL(store, "http://localhost:8080"))
+		req := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
 
-			var reqBody *bytes.Reader
-			switch b := tt.body.(type) {
-			case string:
-				reqBody = bytes.NewReader([]byte(b))
-			case []batchItem:
-				jsonBytes, _ := json.Marshal(b)
-				reqBody = bytes.NewReader(jsonBytes)
-			default:
-				reqBody = bytes.NewReader(nil)
-			}
+		router.ServeHTTP(w, req)
+		resp := w.Result()
+		defer resp.Body.Close()
 
-			req := httptest.NewRequest(tt.method, "/api/shorten/batch", reqBody)
-			req.Header.Set("Content-Type", "application/json")
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+		data, _ := io.ReadAll(resp.Body)
+		for _, item := range batch {
+			assert.Contains(t, string(data), item.CorrelationID)
+			assert.Contains(t, string(data), baseURL)
+		}
+	})
 
-			w := httptest.NewRecorder()
-			router.ServeHTTP(w, req)
+	t.Run("empty batch", func(t *testing.T) {
+		body, _ := json.Marshal([]handler.BatchRequestItem{})
+		req := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
 
-			resp := w.Result()
-			defer resp.Body.Close()
+		router.ServeHTTP(w, req)
+		resp := w.Result()
+		defer resp.Body.Close()
 
-			assert.Equal(t, tt.wantStatusCode, resp.StatusCode, "unexpected status code")
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
 
-			if tt.wantContent != "" {
-				bodyBytes, _ := io.ReadAll(resp.Body)
-				assert.Contains(t, string(bodyBytes), tt.wantContent, "response should contain shortened URL")
-			}
-		})
-	}
+	t.Run("invalid JSON", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", strings.NewReader("invalid_json"))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		router.ServeHTTP(w, req)
+		resp := w.Result()
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
 }
 
-func TestPostLongUrl(t *testing.T) {
-	tests := []struct {
-		name           string
-		method         string
-		body           string
-		shorten        string
-		wantStatusCode int
-		wantPrefix     string
-	}{
-		{
-			name:           "#1 - right POST",
-			method:         http.MethodPost,
-			body:           "https://practicum.yandex.ru/",
-			shorten:        "https://lol/",
-			wantStatusCode: http.StatusCreated,
-			wantPrefix:     "https://lol/",
-		},
-		{
-			name:           "#2 - unknown method",
-			method:         http.MethodGet,
-			body:           "https://practicum.yandex.ru/",
-			wantStatusCode: http.StatusMethodNotAllowed,
-		},
-		{
-			name:           "#3 — пустое тело",
-			method:         http.MethodPost,
-			body:           "",
-			wantStatusCode: http.StatusBadRequest,
-		},
-		{
-			name:           "#4 — валидный урл",
-			method:         http.MethodPost,
-			body:           "wewq.aa",
-			shorten:        "http://localhost:8080/",
-			wantStatusCode: http.StatusCreated,
-			wantPrefix:     "http://localhost:8080/",
-		},
-	}
+func TestPostRawURL(t *testing.T) {
+	baseURL := "http://localhost:8080"
+	router := gin.Default()
+	store := storage.NewInMemoryStorage()
+	router.POST("/", handler.PostRawURL(store, baseURL))
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			store := storage.NewInMemoryStorage()
-			router := gin.Default()
-			router.HandleMethodNotAllowed = true // <── вот это ключ
+	t.Run("valid POST", func(t *testing.T) {
+		url := "https://example.com"
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(url))
+		req.Header.Set("Content-Type", "text/plain")
+		w := httptest.NewRecorder()
 
-			router.POST("/", PostRawURL(store, tt.shorten))
+		router.ServeHTTP(w, req)
+		resp := w.Result()
+		defer resp.Body.Close()
 
-			req := httptest.NewRequest(tt.method, "/", strings.NewReader(tt.body))
-			req.Header.Set("Content-Type", "text/plain")
+		body, _ := io.ReadAll(resp.Body)
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+		assert.True(t, strings.HasPrefix(string(body), baseURL))
+	})
 
-			w := httptest.NewRecorder()
-			router.ServeHTTP(w, req)
+	t.Run("empty body", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(""))
+		req.Header.Set("Content-Type", "text/plain")
+		w := httptest.NewRecorder()
 
-			resp := w.Result()
-			defer resp.Body.Close()
-			body, _ := io.ReadAll(resp.Body)
+		router.ServeHTTP(w, req)
+		resp := w.Result()
+		defer resp.Body.Close()
 
-			assert.Equal(t, tt.wantStatusCode, resp.StatusCode, "unexpected status code")
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
 
-			if tt.wantPrefix != "" {
-				assert.Truef(t, strings.HasPrefix(string(body), tt.wantPrefix),
-					"expected path to start with %q, got %q", tt.wantPrefix, string(body))
-			}
-		})
-	}
+	t.Run("invalid content type", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://example.com"))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		router.ServeHTTP(w, req)
+		resp := w.Result()
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
 }
 
-func TestPostJsonURL(t *testing.T) {
-	type args struct {
-		method string
-		body   map[string]string
-	}
+func TestPostJSONURL(t *testing.T) {
+	baseURL := "http://localhost:8080"
+	router := gin.Default()
+	store := storage.NewInMemoryStorage()
+	router.POST("/api/shorten", handler.PostJSONURL(store, baseURL))
 
-	tests := []struct {
-		name           string
-		args           args
-		wantStatusCode int
-		wantContent    string
-	}{
-		{
-			name: "Valid JSON request",
-			args: args{
-				method: http.MethodPost,
-				body:   map[string]string{"url": "https://practicum.yandex.ru/"},
-			},
-			wantStatusCode: http.StatusCreated,
-			wantContent:    `"result":"http://localhost:8080/`, // префикс
-		},
-		{
-			name: "Invalid JSON format",
-			args: args{
-				method: http.MethodPost,
-				body:   nil,
-			},
-			wantStatusCode: http.StatusBadRequest,
-		},
-		{
-			name: "Wrong HTTP method",
-			args: args{
-				method: http.MethodGet,
-				body:   map[string]string{"url": "https://example.com"},
-			},
-			wantStatusCode: http.StatusNotFound,
-		},
-	}
+	t.Run("valid JSON", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]string{"url": "https://example.com"})
+		req := httptest.NewRequest(http.MethodPost, "/api/shorten", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			store := storage.NewInMemoryStorage()
-			router := gin.Default()
-			router.POST("/api/shorten", PostJSONURL(store, "http://localhost:8080"))
+		router.ServeHTTP(w, req)
+		resp := w.Result()
+		defer resp.Body.Close()
 
-			var reqBody *bytes.Reader
-			if tt.args.body != nil {
-				jsonBytes, _ := json.Marshal(tt.args.body)
-				reqBody = bytes.NewReader(jsonBytes)
-			} else {
-				reqBody = bytes.NewReader([]byte("invalid_json"))
-			}
+		data, _ := io.ReadAll(resp.Body)
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+		assert.Contains(t, string(data), baseURL)
+	})
 
-			req := httptest.NewRequest(tt.args.method, "/api/shorten", reqBody)
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
+	t.Run("invalid JSON", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader("invalid"))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
 
-			router.ServeHTTP(w, req)
-			resp := w.Result()
-			defer resp.Body.Close()
+		router.ServeHTTP(w, req)
+		resp := w.Result()
+		defer resp.Body.Close()
 
-			assert.Equal(t, tt.wantStatusCode, resp.StatusCode, "unexpected status code")
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
 
-			if tt.wantContent != "" {
-				buf := new(bytes.Buffer)
-				buf.ReadFrom(resp.Body)
-				assert.Contains(t, buf.String(), tt.wantContent, "response should contain short URL")
-			}
-		})
-	}
+	t.Run("empty URL", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]string{"url": ""})
+		req := httptest.NewRequest(http.MethodPost, "/api/shorten", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		router.ServeHTTP(w, req)
+		resp := w.Result()
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
 }

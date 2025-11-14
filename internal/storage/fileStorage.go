@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 
 	"go.uber.org/zap"
@@ -18,12 +19,13 @@ type ShortURLRecord struct {
 }
 
 type FileStorage struct {
-	mu     sync.RWMutex
-	path   string
-	file   *os.File
-	data   map[string]string
-	logger *zap.Logger
-	nextID int
+	mu              sync.RWMutex
+	path            string
+	file            *os.File
+	data            map[string]string
+	originalToShort map[string]string
+	logger          *zap.Logger
+	nextID          int
 }
 
 func NewFileStorage(path string, logger *zap.Logger) (*FileStorage, error) {
@@ -39,45 +41,76 @@ func NewFileStorage(path string, logger *zap.Logger) (*FileStorage, error) {
 	}
 	fs.file = file
 
+	if _, err := fs.file.Seek(0, 0); err != nil {
+		return nil, fmt.Errorf("cannot seek file: %w", err)
+	}
+
 	if err := fs.load(); err != nil {
 		logger.Warn("Failed to load storage", zap.Error(err))
+	}
+
+	fs.file.Close()
+	fs.file, err = os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		logger.Warn("Failed to open file storage", zap.Error(err))
+		return nil, err
 	}
 
 	logger.Info("File storage initialized", zap.String("path", path), zap.Int("count", len(fs.data)))
 	return fs, nil
 }
 
-func (fs *FileStorage) SaveBatch(ctx context.Context, batch map[string]string) error {
+func (fs *FileStorage) SaveBatch(ctx context.Context, batch map[string]string) (
+	map[string]string, map[string]string, error,
+) {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
-	for id, url := range batch {
+	newMap := make(map[string]string)
+	conflictMap := make(map[string]string)
+
+	for _, v := range batch {
+		parts := strings.SplitN(v, "|", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		originalURL := parts[0]
+		shortID := parts[1]
+
+		// есть конфликт?
+		if existing, ok := fs.originalToShort[originalURL]; ok {
+			conflictMap[originalURL] = existing
+			continue
+		}
+
+		// запись новая — сохраняем
 		fs.nextID++
-		fs.data[id] = url
+		fs.data[shortID] = originalURL
+		fs.originalToShort[originalURL] = shortID
+		newMap[originalURL] = shortID
 
 		rec := ShortURLRecord{
 			UUID:        fs.nextID,
-			ShortURL:    id,
-			OriginalURL: url,
+			ShortURL:    shortID,
+			OriginalURL: originalURL,
 		}
 
 		bytes, err := json.Marshal(rec)
-		if err != nil {
-			fs.logger.Error("Failed to marshal record", zap.Error(err))
-			continue
-		}
-		if _, err := fs.file.Write(append(bytes, '\n')); err != nil {
-			fs.logger.Error("Failed to append record to file", zap.Error(err))
-			continue
+		if err == nil {
+			_, _ = fs.file.Write(append(bytes, '\n'))
 		}
 	}
 
-	return nil
+	return newMap, conflictMap, nil
 }
 
-func (fs *FileStorage) Save(id, url string) {
+func (fs *FileStorage) Save(ctx context.Context, id, url string) (string, bool, error) {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
+
+	if existing, ok := fs.originalToShort[id]; ok {
+		return existing, true, nil
+	}
 
 	fs.nextID++
 	fs.data[id] = url
@@ -91,13 +124,15 @@ func (fs *FileStorage) Save(id, url string) {
 	bytes, err := json.Marshal(rec)
 	if err != nil {
 		fs.logger.Error("Failed to marshal record", zap.Error(err))
-		return
+		return "", false, err
 	}
 
 	if _, err := fs.file.Write(append(bytes, '\n')); err != nil {
 		fs.logger.Error("Failed to append record to file", zap.Error(err))
+		return "", false, err
 	}
 	fs.logger.Info("Saved record", zap.String("short", id), zap.String("url", url))
+	return id, true, nil
 }
 
 func (fs *FileStorage) Get(id string) (string, bool) {
