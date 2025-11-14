@@ -83,11 +83,6 @@ func PostBatchURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 			}
 		}
 
-		//if len(conflictMap) > 0 {
-		//	c.JSON(http.StatusConflict, response)
-		//} else {
-		//	c.JSON(http.StatusCreated, response)
-		//}
 		c.JSON(http.StatusCreated, response)
 	}
 }
@@ -120,11 +115,6 @@ func PostJSONURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 		}
 
 		shortURL := fmt.Sprintf("%s/%s", strings.TrimRight(baseURL, "/"), shortID)
-
-		//if conflict {
-		//	c.JSON(http.StatusConflict, ResponseJSON{Result: shortURL})
-		//	return
-		//}
 
 		c.JSON(http.StatusCreated, ResponseJSON{Result: shortURL})
 	}
@@ -161,11 +151,6 @@ func PostRawURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 		}
 
 		shortURL := fmt.Sprintf("%s/%s", strings.TrimRight(baseURL, "/"), shortID)
-
-		//if conflict {
-		//	c.String(http.StatusConflict, shortURL)
-		//	return
-		//}
 
 		c.String(http.StatusCreated, shortURL)
 	}
