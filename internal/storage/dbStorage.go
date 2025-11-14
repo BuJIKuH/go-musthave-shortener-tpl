@@ -12,7 +12,7 @@ import (
 )
 
 type DBStorage struct {
-	Db     *sql.DB
+	DB     *sql.DB
 	Logger *zap.Logger
 }
 
@@ -31,7 +31,7 @@ func NewDBStorage(dsn string, logger *zap.Logger) (*DBStorage, error) {
 	logger.Info("Connected to PostgreSQL successfully")
 
 	return &DBStorage{
-		Db:     db,
+		DB:     db,
 		Logger: logger,
 	}, nil
 }
@@ -40,7 +40,7 @@ func (s *DBStorage) SaveBatch(ctx context.Context, batch map[string]string) (map
 	newMap := make(map[string]string)
 	conflictMap := make(map[string]string)
 
-	tx, err := s.Db.BeginTx(ctx, nil)
+	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		s.Logger.Error("failed to start transaction", zap.Error(err))
 		return nil, nil, err
@@ -129,7 +129,7 @@ func (s *DBStorage) Save(ctx context.Context, id, url string) (string, bool, err
 	`
 
 	var savedID string
-	err := s.Db.QueryRowContext(ctx, query, id, url).Scan(&savedID)
+	err := s.DB.QueryRowContext(ctx, query, id, url).Scan(&savedID)
 
 	switch {
 	case err == nil:
@@ -139,7 +139,7 @@ func (s *DBStorage) Save(ctx context.Context, id, url string) (string, bool, err
 	case errors.Is(err, sql.ErrNoRows):
 		var existingID string
 		sel := `SELECT short_url FROM urls WHERE original_url = $1`
-		if err := s.Db.QueryRowContext(ctx, sel, url).Scan(&existingID); err != nil {
+		if err := s.DB.QueryRowContext(ctx, sel, url).Scan(&existingID); err != nil {
 			s.Logger.Error("conflict but cannot fetch existing short_url", zap.Error(err))
 			return "", false, err
 		}
@@ -157,7 +157,7 @@ func (s *DBStorage) Get(id string) (string, bool) {
 	defer cancel()
 	query := `SELECT original_url FROM urls WHERE short_url = $1`
 	var original string
-	err := s.Db.QueryRowContext(ctx, query, id).Scan(&original)
+	err := s.DB.QueryRowContext(ctx, query, id).Scan(&original)
 	if err != nil {
 		s.Logger.Error("Failed to get record from DB", zap.Error(err))
 		return "", false
@@ -166,9 +166,9 @@ func (s *DBStorage) Get(id string) (string, bool) {
 }
 
 func (s *DBStorage) Ping(ctx context.Context) error {
-	return s.Db.PingContext(ctx)
+	return s.DB.PingContext(ctx)
 }
 
 func (s *DBStorage) Close() error {
-	return s.Db.Close()
+	return s.DB.Close()
 }

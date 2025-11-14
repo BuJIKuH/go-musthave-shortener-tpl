@@ -20,7 +20,7 @@ func TestDBStorage_Save(t *testing.T) {
 	defer db.Close()
 
 	s := &storage.DBStorage{
-		Db:     db,
+		DB:     db,
 		Logger: logger,
 	}
 
@@ -62,7 +62,7 @@ func TestDBStorage_SaveBatch(t *testing.T) {
 	defer db.Close()
 
 	s := &storage.DBStorage{
-		Db:     db,
+		DB:     db,
 		Logger: logger,
 	}
 
