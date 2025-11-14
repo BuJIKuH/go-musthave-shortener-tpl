@@ -112,7 +112,7 @@ func PostJSONURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 			return
 		}
 
-		shortID, conflict, err := s.Save(ctx, id, req.URL)
+		shortID, _, err := s.Save(ctx, id, req.URL)
 		if err != nil {
 			c.JSON(http.StatusConflict, gin.H{"error": "DB error"})
 			return
@@ -120,10 +120,10 @@ func PostJSONURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 
 		shortURL := fmt.Sprintf("%s/%s", strings.TrimRight(baseURL, "/"), shortID)
 
-		if conflict {
-			c.JSON(http.StatusConflict, ResponseJSON{Result: shortURL})
-			return
-		}
+		//if conflict {
+		//	c.JSON(http.StatusConflict, ResponseJSON{Result: shortURL})
+		//	return
+		//}
 
 		c.JSON(http.StatusCreated, ResponseJSON{Result: shortURL})
 	}
