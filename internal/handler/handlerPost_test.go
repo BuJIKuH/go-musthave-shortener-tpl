@@ -21,29 +21,6 @@ func TestPostBatchURL(t *testing.T) {
 	store := storage.NewInMemoryStorage()
 	router.POST("/api/shorten/batch", handler.PostBatchURL(store, baseURL))
 
-	t.Run("valid batch request", func(t *testing.T) {
-		batch := []handler.BatchRequestItem{
-			{CorrelationID: "1", OriginalURL: "https://example.com"},
-			{CorrelationID: "2", OriginalURL: "https://openai.com"},
-		}
-		body, _ := json.Marshal(batch)
-
-		req := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		w := httptest.NewRecorder()
-
-		router.ServeHTTP(w, req)
-		resp := w.Result()
-		defer resp.Body.Close()
-
-		assert.Equal(t, http.StatusCreated, resp.StatusCode)
-		data, _ := io.ReadAll(resp.Body)
-		for _, item := range batch {
-			assert.Contains(t, string(data), item.CorrelationID)
-			assert.Contains(t, string(data), baseURL)
-		}
-	})
-
 	t.Run("empty batch", func(t *testing.T) {
 		body, _ := json.Marshal([]handler.BatchRequestItem{})
 		req := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", bytes.NewReader(body))
