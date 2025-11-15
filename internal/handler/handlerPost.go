@@ -38,56 +38,41 @@ func PostBatchURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 
 		var req []BatchRequestItem
 		if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
 		if len(req) == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "empty batch"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "empty body"})
 			return
 		}
 
 		batch := make(map[string]string)
-		corrIndex := make(map[string]string)
+		resp := make([]BatchResponseItem, 0, len(req))
 
 		for _, item := range req {
 			if strings.TrimSpace(item.OriginalURL) == "" {
 				continue
 			}
+
 			id, err := shortener.GenerateID()
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Error generating ID"})
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate short id"})
+				return
 			}
 
 			batch[id] = item.OriginalURL
-			corrIndex[item.OriginalURL] = item.CorrelationID
+			shortURL := fmt.Sprintf("%s/%s", strings.TrimRight(baseURL, "/"), id)
+			resp = append(resp, BatchResponseItem{
+				CorrelationID: item.CorrelationID,
+				ShortURL:      shortURL,
+			})
 		}
-
-		newMap, conflictMap, err := s.SaveBatch(ctx, batch)
-		if err != nil {
-			c.JSON(http.StatusConflict, gin.H{"error": "DB error"})
+		if _, _, err := s.SaveBatch(ctx, batch); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save batch"})
 			return
 		}
-
-		response := make([]BatchResponseItem, 0, len(req))
-
-		appendFromMap := func(m map[string]string) {
-			for shortID, originalURL := range m {
-				corrID := corrIndex[originalURL]
-				if corrID == "" {
-					continue
-				}
-				response = append(response, BatchResponseItem{
-					CorrelationID: corrID,
-					ShortURL:      baseURL + "/" + shortID,
-				})
-			}
-		}
-
-		appendFromMap(newMap)
-		appendFromMap(conflictMap)
-
-		c.JSON(http.StatusCreated, response)
+		c.JSON(http.StatusCreated, resp)
 	}
 }
 
