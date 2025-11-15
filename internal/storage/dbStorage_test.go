@@ -86,4 +86,5 @@ func TestDBStorage_SaveBatch(t *testing.T) {
 	assert.Equal(t, map[string]string{"https://a.com": "shortA"}, newMap)
 	assert.Empty(t, conflictMap)
 	assert.NoError(t, mock.ExpectationsWereMet())
+
 }
