@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -98,13 +99,19 @@ func PostJSONURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 		}
 
 		shortID, _, err := s.Save(ctx, id, req.URL)
+
+		if errors.Is(err, storage.ErrURLExists) {
+			// shortID — уже существующий
+			shortURL := fmt.Sprintf("%s/%s", strings.TrimRight(baseURL, "/"), shortID)
+			c.JSON(http.StatusConflict, ResponseJSON{Result: shortURL})
+			return
+		}
 		if err != nil {
-			c.JSON(http.StatusConflict, gin.H{"error": "DB error"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
 		shortURL := fmt.Sprintf("%s/%s", strings.TrimRight(baseURL, "/"), shortID)
-
 		c.JSON(http.StatusCreated, ResponseJSON{Result: shortURL})
 	}
 }
@@ -134,13 +141,18 @@ func PostRawURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 		}
 
 		shortID, _, err := s.Save(ctx, id, originalURL)
+
+		if errors.Is(err, storage.ErrURLExists) {
+			shortURL := fmt.Sprintf("%s/%s", strings.TrimRight(baseURL, "/"), shortID)
+			c.String(http.StatusConflict, shortURL)
+			return
+		}
 		if err != nil {
-			c.String(http.StatusConflict, "DB error")
+			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
 
 		shortURL := fmt.Sprintf("%s/%s", strings.TrimRight(baseURL, "/"), shortID)
-
 		c.String(http.StatusCreated, shortURL)
 	}
 }
