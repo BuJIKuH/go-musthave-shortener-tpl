@@ -49,13 +49,20 @@ func PostBatchURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 
 		batch := make(map[string]string)
 		shortIDs := make(map[string]string)
+
 		for _, item := range req {
-			if strings.TrimSpace(item.OriginalURL) == "" {
+			orig := strings.TrimSpace(item.OriginalURL)
+			if orig == "" {
 				continue
 			}
-			id, _ := shortener.GenerateID()
-			batch[id] = item.OriginalURL
-			shortIDs[item.OriginalURL] = id
+
+			id, err := shortener.GenerateID()
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			}
+			shortIDs[orig] = id
+
+			batch[item.CorrelationID] = orig + "|" + id
 		}
 
 		newMap, conflictMap, err := s.SaveBatch(ctx, batch)
