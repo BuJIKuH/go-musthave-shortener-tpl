@@ -45,6 +45,31 @@ func TestPostBatchURL(t *testing.T) {
 
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	})
+
+	t.Run("valid batch", func(t *testing.T) {
+		batch := []handler.BatchRequestItem{
+			{CorrelationID: "1", OriginalURL: "https://a.com"},
+			{CorrelationID: "2", OriginalURL: "https://b.com"},
+		}
+
+		body, _ := json.Marshal(batch)
+		req := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		router.ServeHTTP(w, req)
+		resp := w.Result()
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		var result []handler.BatchResponseItem
+		data, _ := io.ReadAll(resp.Body)
+		_ = json.Unmarshal(data, &result)
+
+		assert.Len(t, result, 2)
+		assert.True(t, strings.HasPrefix(result[0].ShortURL, baseURL))
+	})
 }
 
 func TestPostRawURL(t *testing.T) {

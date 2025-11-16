@@ -39,7 +39,7 @@ func PostBatchURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 
 		var req []BatchRequestItem
 		if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
 			return
 		}
 
@@ -48,7 +48,7 @@ func PostBatchURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 			return
 		}
 
-		batch := make(map[string]string)
+		batch := make([]storage.BatchItem, 0, len(req))
 		resp := make([]BatchResponseItem, 0, len(req))
 
 		for _, item := range req {
@@ -62,17 +62,23 @@ func PostBatchURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 				return
 			}
 
-			batch[id] = item.OriginalURL
+			batch = append(batch, storage.BatchItem{
+				ShortID:     id,
+				OriginalURL: item.OriginalURL,
+			})
+
 			shortURL := fmt.Sprintf("%s/%s", strings.TrimRight(baseURL, "/"), id)
 			resp = append(resp, BatchResponseItem{
 				CorrelationID: item.CorrelationID,
 				ShortURL:      shortURL,
 			})
 		}
+
 		if _, _, err := s.SaveBatch(ctx, batch); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save batch"})
 			return
 		}
+
 		c.JSON(http.StatusCreated, resp)
 	}
 }
@@ -98,10 +104,9 @@ func PostJSONURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 			return
 		}
 
-		shortID, _, err := s.Save(ctx, id, req.URL)
+		shortID, err := s.Save(ctx, id, req.URL)
 
 		if errors.Is(err, storage.ErrURLExists) {
-			// shortID — уже существующий
 			shortURL := fmt.Sprintf("%s/%s", strings.TrimRight(baseURL, "/"), shortID)
 			c.JSON(http.StatusConflict, ResponseJSON{Result: shortURL})
 			return
@@ -140,7 +145,7 @@ func PostRawURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 			return
 		}
 
-		shortID, _, err := s.Save(ctx, id, originalURL)
+		shortID, err := s.Save(ctx, id, originalURL)
 
 		if errors.Is(err, storage.ErrURLExists) {
 			shortURL := fmt.Sprintf("%s/%s", strings.TrimRight(baseURL, "/"), shortID)

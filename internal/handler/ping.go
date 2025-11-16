@@ -14,15 +14,11 @@ func PingHandler(store storage.Storage) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
 		defer cancel()
 
-		if db, ok := store.(interface{ Ping(context.Context) error }); ok {
-			if err := db.Ping(ctx); err != nil {
-				c.Status(http.StatusInternalServerError)
-				return
-			}
-			c.Status(http.StatusOK)
+		if err := store.Ping(ctx); err != nil {
+			c.Status(http.StatusInternalServerError)
 			return
 		}
 
-		c.Status(http.StatusInternalServerError)
+		c.Status(http.StatusOK)
 	}
 }

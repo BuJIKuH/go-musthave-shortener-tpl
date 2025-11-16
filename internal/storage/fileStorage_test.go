@@ -64,7 +64,6 @@ func TestFileStorage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			// 🔥 ВАЖНО: свой файл для каждого теста
 			filePath := filepath.Join(t.TempDir(), "test_storage.jsonl")
 
 			fs, err := storage.NewFileStorage(filePath, logger)

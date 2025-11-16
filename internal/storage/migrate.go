@@ -14,7 +14,7 @@ import (
 func RunMigrations(dns string, logger *zap.Logger) error {
 	db, err := sql.Open("postgres", dns)
 	if err != nil {
-		logger.Fatal("cannot open DB", zap.Error(err))
+		logger.Error("cannot open DB", zap.Error(err))
 		return err
 	}
 	defer db.Close()

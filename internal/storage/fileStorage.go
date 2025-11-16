@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 	"sync"
 
 	"go.uber.org/zap"
@@ -26,6 +25,10 @@ type FileStorage struct {
 	originalToShort map[string]string
 	logger          *zap.Logger
 	nextID          int
+}
+
+func (fs *FileStorage) Ping(ctx context.Context) error {
+	return nil
 }
 
 func NewFileStorage(path string, logger *zap.Logger) (*FileStorage, error) {
@@ -60,7 +63,7 @@ func NewFileStorage(path string, logger *zap.Logger) (*FileStorage, error) {
 	return fs, nil
 }
 
-func (fs *FileStorage) SaveBatch(ctx context.Context, batch map[string]string) (
+func (fs *FileStorage) SaveBatch(ctx context.Context, batch []BatchItem) (
 	map[string]string, map[string]string, error,
 ) {
 	fs.mu.Lock()
@@ -69,21 +72,15 @@ func (fs *FileStorage) SaveBatch(ctx context.Context, batch map[string]string) (
 	newMap := make(map[string]string)
 	conflictMap := make(map[string]string)
 
-	for _, v := range batch {
-		parts := strings.SplitN(v, "|", 2)
-		if len(parts) != 2 {
-			continue
-		}
-		originalURL := parts[0]
-		shortID := parts[1]
+	for _, item := range batch {
+		originalURL := item.OriginalURL
+		shortID := item.ShortID
 
-		// есть конфликт?
 		if existing, ok := fs.originalToShort[originalURL]; ok {
 			conflictMap[originalURL] = existing
 			continue
 		}
 
-		// запись новая — сохраняем
 		fs.nextID++
 		fs.data[shortID] = originalURL
 		fs.originalToShort[originalURL] = shortID
@@ -104,12 +101,12 @@ func (fs *FileStorage) SaveBatch(ctx context.Context, batch map[string]string) (
 	return newMap, conflictMap, nil
 }
 
-func (fs *FileStorage) Save(ctx context.Context, id, url string) (string, bool, error) {
+func (fs *FileStorage) Save(ctx context.Context, id, url string) (string, error) {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
 	if existing, ok := fs.originalToShort[id]; ok {
-		return existing, true, nil
+		return existing, nil
 	}
 
 	fs.nextID++
@@ -124,15 +121,15 @@ func (fs *FileStorage) Save(ctx context.Context, id, url string) (string, bool, 
 	bytes, err := json.Marshal(rec)
 	if err != nil {
 		fs.logger.Error("Failed to marshal record", zap.Error(err))
-		return "", false, err
+		return "", err
 	}
 
 	if _, err := fs.file.Write(append(bytes, '\n')); err != nil {
 		fs.logger.Error("Failed to append record to file", zap.Error(err))
-		return "", false, err
+		return "", err
 	}
 	fs.logger.Info("Saved record", zap.String("short", id), zap.String("url", url))
-	return id, true, nil
+	return id, nil
 }
 
 func (fs *FileStorage) Get(id string) (string, bool) {

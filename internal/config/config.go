@@ -38,7 +38,7 @@ func InitConfig() *Config {
 	envAddress := os.Getenv("SERVER_ADDRESS")
 	envBaseURL := os.Getenv("BASE_URL")
 	envStoragePath := os.Getenv("FILE_STORAGE_PATH")
-	envDatabaseDNS := os.Getenv("DATABASE_DSN")
+	envDatabaseDNS := os.Getenv("DATABASE_DNS")
 
 	if envAddress != "" {
 		cfg.Address = envAddress

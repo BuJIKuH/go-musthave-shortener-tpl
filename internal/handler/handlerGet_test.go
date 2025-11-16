@@ -13,9 +13,10 @@ import (
 )
 
 func TestGetIDURL(t *testing.T) {
-	// Общий store с одной сохранённой ссылкой
 	store := storage.NewInMemoryStorage()
-	store.Save(context.Background(), "sdasda", "https://practicum.yandex.ru/")
+
+	_, err := store.Save(context.Background(), "sdasda", "https://practicum.yandex.ru/")
+	assert.NoError(t, err)
 
 	router := gin.New()
 	router.GET("/:id", handler.GetIDURL(store))

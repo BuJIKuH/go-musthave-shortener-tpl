@@ -2,19 +2,28 @@ package storage
 
 import (
 	"context"
-	"strings"
 	"sync"
 )
 
 type Storage interface {
-	Save(ctx context.Context, id, url string) (string, bool, error)
+	Save(ctx context.Context, id, url string) (string, error)
 	Get(id string) (string, bool)
-	SaveBatch(ctx context.Context, batch map[string]string) (map[string]string, map[string]string, error)
+	SaveBatch(ctx context.Context, batch []BatchItem) (map[string]string, map[string]string, error)
+	Ping(ctx context.Context) error
 }
+type BatchItem struct {
+	ShortID     string
+	OriginalURL string
+}
+
 type InMemoryStorage struct {
 	mu              sync.RWMutex
 	data            map[string]string
 	originalToShort map[string]string
+}
+
+func (s *InMemoryStorage) Ping(ctx context.Context) error {
+	return nil
 }
 
 func NewInMemoryStorage() *InMemoryStorage {
@@ -24,24 +33,19 @@ func NewInMemoryStorage() *InMemoryStorage {
 	}
 }
 
-func (s *InMemoryStorage) SaveBatch(ctx context.Context, batch map[string]string) (map[string]string, map[string]string, error) {
+func (s *InMemoryStorage) SaveBatch(ctx context.Context, batch []BatchItem) (map[string]string, map[string]string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	newMap := make(map[string]string)
 	conflictMap := make(map[string]string)
 
-	for _, v := range batch {
-		parts := strings.SplitN(v, "|", 2)
-		if len(parts) != 2 {
-			continue
-		}
+	for _, item := range batch {
+		originalURL := item.OriginalURL
+		shortID := item.ShortID
 
-		originalURL := parts[0]
-		shortID := parts[1]
-
-		if existingID, ok := s.originalToShort[originalURL]; ok {
-			conflictMap[originalURL] = existingID
+		if existing, ok := s.originalToShort[originalURL]; ok {
+			conflictMap[originalURL] = existing
 			continue
 		}
 
@@ -53,7 +57,7 @@ func (s *InMemoryStorage) SaveBatch(ctx context.Context, batch map[string]string
 	return newMap, conflictMap, nil
 }
 
-func (s *InMemoryStorage) Save(ctx context.Context, id, url string) (string, bool, error) {
+func (s *InMemoryStorage) Save(ctx context.Context, id, url string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.data[id] = url
@@ -61,7 +65,7 @@ func (s *InMemoryStorage) Save(ctx context.Context, id, url string) (string, boo
 	s.data[id] = url
 	s.originalToShort[url] = id
 
-	return id, false, nil
+	return id, nil
 }
 
 func (s *InMemoryStorage) Get(id string) (string, bool) {

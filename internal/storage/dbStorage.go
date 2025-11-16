@@ -36,7 +36,7 @@ func NewDBStorage(dsn string, logger *zap.Logger) (*DBStorage, error) {
 	}, nil
 }
 
-func (s *DBStorage) SaveBatch(ctx context.Context, batch map[string]string) (map[string]string, map[string]string, error) {
+func (s *DBStorage) SaveBatch(ctx context.Context, batch []BatchItem) (map[string]string, map[string]string, error) {
 	newMap := make(map[string]string)
 	conflictMap := make(map[string]string)
 
@@ -76,7 +76,10 @@ func (s *DBStorage) SaveBatch(ctx context.Context, batch map[string]string) (map
 		return nil, nil, err
 	}
 
-	for shortID, origURL := range batch {
+	for _, item := range batch {
+		shortID := item.ShortID
+		origURL := item.OriginalURL
+
 		var returnedID string
 		err = stmtInsert.QueryRowContext(ctx, shortID, origURL).Scan(&returnedID)
 
@@ -120,7 +123,7 @@ func (s *DBStorage) SaveBatch(ctx context.Context, batch map[string]string) (map
 	return newMap, conflictMap, nil
 }
 
-func (s *DBStorage) Save(ctx context.Context, id, url string) (string, bool, error) {
+func (s *DBStorage) Save(ctx context.Context, id, url string) (string, error) {
 	query := `
        INSERT INTO urls (short_url, original_url)
         VALUES ($1, $2)
@@ -134,21 +137,21 @@ func (s *DBStorage) Save(ctx context.Context, id, url string) (string, bool, err
 	switch {
 	case err == nil:
 		s.Logger.Info("Saved record", zap.String("short", savedID), zap.String("url", url))
-		return savedID, true, nil
+		return savedID, nil
 
 	case errors.Is(err, sql.ErrNoRows):
 		var existingID string
 		sel := `SELECT short_url FROM urls WHERE original_url = $1`
 		if err := s.DB.QueryRowContext(ctx, sel, url).Scan(&existingID); err != nil {
 			s.Logger.Error("conflict but cannot fetch existing short_url", zap.Error(err))
-			return "", false, err
+			return "", err
 		}
 		s.Logger.Info("URL already exists", zap.String("short", existingID), zap.String("url", url))
-		return existingID, false, ErrURLExists
+		return existingID, ErrURLExists
 
 	default:
 		s.Logger.Error("DB save failed", zap.Error(err))
-		return "", false, err
+		return "", err
 	}
 }
 
