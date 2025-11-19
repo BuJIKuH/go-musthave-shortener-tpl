@@ -2,15 +2,21 @@ package shortener
 
 import (
 	"crypto/rand"
-	"encoding/base64"
+	"math/big"
 )
+
+const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 func GenerateID() (string, error) {
 	n := 8
-	b := make([]byte, n)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
+	id := make([]byte, n)
 
-	return base64.URLEncoding.EncodeToString(b)[:n], nil
+	for i := 0; i < n; i++ {
+		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			return "", err
+		}
+		id[i] = charset[num.Int64()]
+	}
+	return string(id), nil
 }

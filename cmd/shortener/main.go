@@ -6,7 +6,8 @@ import (
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/handler"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/middleware"
-	storage2 "github.com/BuJIKuH/go-musthave-shortener-tpl/internal/storage"
+	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/storage"
+
 	"github.com/gin-gonic/gin"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -33,16 +34,29 @@ func NewLogger() (*zap.Logger, error) {
 	return logger, nil
 }
 
-func newStorage(cfg *config.Config, logger *zap.Logger) (storage2.Storage, error) {
+func newStorage(cfg *config.Config, logger *zap.Logger) (storage.Storage, error) {
+	if cfg.DatabaseDSN != "" {
+		if err := storage.RunMigrations(cfg.DatabaseDSN, logger); err != nil {
+			logger.Error("can't initialize database migrations", zap.Error(err))
+		}
+
+		dbStore, err := storage.NewDBStorage(cfg.DatabaseDSN, logger)
+		if err == nil {
+			logger.Info("Using PostgreSQL storage")
+			return dbStore, nil
+		}
+		logger.Error("Failed to connect to PostgreSQL, falling back to file storage", zap.Error(err))
+	}
+
 	if cfg.FileStoragePath != "" {
 		logger.Info("Using file storage", zap.String("path", cfg.FileStoragePath))
-		return storage2.NewFileStorage(cfg.FileStoragePath, logger)
+		return storage.NewFileStorage(cfg.FileStoragePath, logger)
 	}
 	logger.Info("Using in-memory storage")
-	return storage2.NewInMemoryStorage(), nil
+	return storage.NewInMemoryStorage(), nil
 }
 
-func newRouter(cfg *config.Config, store storage2.Storage, logger *zap.Logger) *gin.Engine {
+func newRouter(cfg *config.Config, store storage.Storage, logger *zap.Logger) *gin.Engine {
 	r := gin.New()
 	r.Use(
 		middleware.Logger(logger),
@@ -52,6 +66,8 @@ func newRouter(cfg *config.Config, store storage2.Storage, logger *zap.Logger) *
 	r.POST("/", handler.PostRawURL(store, cfg.ShortenAddress))
 	r.GET("/:id", handler.GetIDURL(store))
 	r.POST("/api/shorten", handler.PostJSONURL(store, cfg.ShortenAddress))
+	r.GET("/ping", handler.PingHandler(store))
+	r.POST("/api/shorten/batch", handler.PostBatchURL(store, cfg.ShortenAddress))
 	return r
 }
 
