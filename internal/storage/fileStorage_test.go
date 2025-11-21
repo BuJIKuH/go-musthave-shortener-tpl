@@ -19,15 +19,14 @@ func TestFileStorage(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
 
 	tests := []struct {
-		name        string
-		setup       func(fs *storage.FileStorage)
-		validate    func(fs *storage.FileStorage, t *testing.T)
-		description string
+		name     string
+		setup    func(fs *storage.FileStorage)
+		validate func(fs *storage.FileStorage, t *testing.T)
 	}{
 		{
 			name: "save and get single record",
 			setup: func(fs *storage.FileStorage) {
-				fs.Save(context.Background(), "short1", "https://ya.ru")
+				fs.Save(context.Background(), "user123", "short1", "https://ya.ru")
 			},
 			validate: func(fs *storage.FileStorage, t *testing.T) {
 				url, ok := fs.Get("short1")
@@ -45,7 +44,7 @@ func TestFileStorage(t *testing.T) {
 						defer wg.Done()
 						short := fmt.Sprintf("short_%d", i)
 						url := fmt.Sprintf("https://example.com/%d", i)
-						fs.Save(context.Background(), short, url)
+						fs.Save(context.Background(), "userABC", short, url)
 					}(i)
 				}
 				wg.Wait()
@@ -82,7 +81,7 @@ func TestFileStorage(t *testing.T) {
 		assert.NoError(t, err)
 		defer fs.Close()
 
-		fs.Save(context.Background(), "shortX", "https://jsonl-format.ru")
+		fs.Save(context.Background(), "UID", "shortX", "https://jsonl-format.ru")
 
 		file, _ := os.Open(filePath)
 		defer file.Close()

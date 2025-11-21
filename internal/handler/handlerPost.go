@@ -37,6 +37,13 @@ func PostBatchURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
 		defer cancel()
 
+		u, ok := c.Get("userID")
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing userID"})
+			return
+		}
+		userID := u.(string)
+
 		var req []BatchRequestItem
 		if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
@@ -68,13 +75,14 @@ func PostBatchURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 			})
 
 			shortURL := fmt.Sprintf("%s/%s", strings.TrimRight(baseURL, "/"), id)
+
 			resp = append(resp, BatchResponseItem{
 				CorrelationID: item.CorrelationID,
 				ShortURL:      shortURL,
 			})
 		}
 
-		if _, _, err := s.SaveBatch(ctx, batch); err != nil {
+		if _, _, err := s.SaveBatch(ctx, userID, batch); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save batch"})
 			return
 		}
@@ -98,13 +106,16 @@ func PostJSONURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 			return
 		}
 
+		u, _ := c.Get("userID")
+		userID := u.(string)
+
 		id, err := shortener.GenerateID()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate id"})
 			return
 		}
 
-		shortID, err := s.Save(ctx, id, req.URL)
+		shortID, err := s.Save(ctx, userID, id, req.URL)
 
 		if errors.Is(err, storage.ErrURLExists) {
 			shortURL := fmt.Sprintf("%s/%s", strings.TrimRight(baseURL, "/"), shortID)
@@ -139,13 +150,16 @@ func PostRawURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
 		defer cancel()
 
+		u, _ := c.Get("userID")
+		userID := u.(string)
+
 		id, err := shortener.GenerateID()
 		if err != nil {
-			c.String(http.StatusInternalServerError, "failed to generate id")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate id"})
 			return
 		}
 
-		shortID, err := s.Save(ctx, id, originalURL)
+		shortID, err := s.Save(ctx, userID, id, originalURL)
 
 		if errors.Is(err, storage.ErrURLExists) {
 			shortURL := fmt.Sprintf("%s/%s", strings.TrimRight(baseURL, "/"), shortID)

@@ -13,6 +13,7 @@ type Config struct {
 	ShortenAddress  string `env:"BASE_URL"`
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	DatabaseDSN     string `env:"DATABASE_DSN"`
+	AuthSecret      string `env:"AUTH_SECRET"`
 }
 
 func (f *Config) String() string {
@@ -39,6 +40,11 @@ func InitConfig() *Config {
 	envBaseURL := os.Getenv("BASE_URL")
 	envStoragePath := os.Getenv("FILE_STORAGE_PATH")
 	envDatabaseDNS := os.Getenv("DATABASE_DNS")
+	envAuthSecret := os.Getenv("AUTH_SECRET")
+
+	if envAuthSecret != "" {
+		cfg.AuthSecret = envAuthSecret
+	}
 
 	if envAddress != "" {
 		cfg.Address = envAddress
