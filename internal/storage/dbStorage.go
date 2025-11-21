@@ -160,6 +160,9 @@ func (s *DBStorage) GetUserURLs(ctx context.Context, userID string) ([]BatchItem
 		}
 		result = append(result, it)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	return result, nil
 }
