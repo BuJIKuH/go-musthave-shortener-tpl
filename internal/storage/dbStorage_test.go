@@ -25,13 +25,14 @@ func TestDBStorage_Save(t *testing.T) {
 	}
 
 	ctx := context.Background()
+	userID := "user123"
 
 	t.Run("insert new URL", func(t *testing.T) {
 		mock.ExpectQuery("INSERT INTO urls .* RETURNING short_url").
-			WithArgs("short1", "https://example.com").
+			WithArgs("short1", "https://example.com", userID).
 			WillReturnRows(sqlmock.NewRows([]string{"short_url"}).AddRow("short1"))
 
-		shortID, err := s.Save(ctx, "short1", "https://example.com")
+		shortID, err := s.Save(ctx, userID, "short1", "https://example.com")
 		assert.NoError(t, err)
 		assert.Equal(t, "short1", shortID)
 		assert.NoError(t, mock.ExpectationsWereMet())
@@ -40,14 +41,14 @@ func TestDBStorage_Save(t *testing.T) {
 	t.Run("URL already exists", func(t *testing.T) {
 
 		mock.ExpectQuery("INSERT INTO urls .* RETURNING short_url").
-			WithArgs("short2", "https://exists.com").
+			WithArgs("short2", "https://exists.com", userID).
 			WillReturnError(sql.ErrNoRows)
 
 		mock.ExpectQuery("SELECT short_url FROM urls WHERE original_url = \\$1").
 			WithArgs("https://exists.com").
 			WillReturnRows(sqlmock.NewRows([]string{"short_url"}).AddRow("existing1"))
 
-		shortID, err := s.Save(ctx, "short2", "https://exists.com")
+		shortID, err := s.Save(ctx, userID, "short2", "https://exists.com")
 		assert.ErrorIs(t, err, storage.ErrURLExists)
 		assert.Equal(t, "existing1", shortID)
 
@@ -67,16 +68,17 @@ func TestDBStorage_SaveBatch(t *testing.T) {
 	}
 
 	ctx := context.Background()
+	userID := "user123"
 
 	// Начало транзакции
 	mock.ExpectBegin()
 
 	mock.ExpectPrepare("INSERT INTO urls .* RETURNING short_url")
 	mock.ExpectPrepare("SELECT short_url FROM urls WHERE original_url = \\$1")
-	mock.ExpectPrepare("SELECT original_url FROM urls WHERE short_url = \\$1")
 
+	// успешная вставка
 	mock.ExpectQuery("INSERT INTO urls .* RETURNING short_url").
-		WithArgs("shortA", "https://a.com").
+		WithArgs("shortA", "https://a.com", userID).
 		WillReturnRows(sqlmock.NewRows([]string{"short_url"}).AddRow("shortA"))
 
 	mock.ExpectCommit()
@@ -85,7 +87,7 @@ func TestDBStorage_SaveBatch(t *testing.T) {
 		{ShortID: "shortA", OriginalURL: "https://a.com"},
 	}
 
-	newMap, conflictMap, err := s.SaveBatch(ctx, batch)
+	newMap, conflictMap, err := s.SaveBatch(ctx, userID, batch)
 	assert.NoError(t, err)
 	assert.Equal(t, map[string]string{"https://a.com": "shortA"}, newMap)
 	assert.Empty(t, conflictMap)

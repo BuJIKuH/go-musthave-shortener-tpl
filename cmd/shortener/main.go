@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 
+	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/auth"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/handler"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/middleware"
@@ -20,9 +21,14 @@ func main() {
 			newStorage,
 			newRouter,
 			NewLogger,
+			NewAuthManager,
 		),
 		fx.Invoke(startServer),
 	).Run()
+}
+
+func NewAuthManager(cfg *config.Config) *auth.Manager {
+	return auth.NewManager(cfg.AuthSecret)
 }
 
 func NewLogger() (*zap.Logger, error) {
@@ -56,11 +62,12 @@ func newStorage(cfg *config.Config, logger *zap.Logger) (storage.Storage, error)
 	return storage.NewInMemoryStorage(), nil
 }
 
-func newRouter(cfg *config.Config, store storage.Storage, logger *zap.Logger) *gin.Engine {
+func newRouter(cfg *config.Config, store storage.Storage, am *auth.Manager, logger *zap.Logger) *gin.Engine {
 	r := gin.New()
 	r.Use(
 		middleware.Logger(logger),
 		middleware.GzipMiddleware(logger),
+		middleware.AuthMiddleware(am, logger),
 	)
 
 	r.POST("/", handler.PostRawURL(store, cfg.ShortenAddress))
@@ -68,6 +75,7 @@ func newRouter(cfg *config.Config, store storage.Storage, logger *zap.Logger) *g
 	r.POST("/api/shorten", handler.PostJSONURL(store, cfg.ShortenAddress))
 	r.GET("/ping", handler.PingHandler(store))
 	r.POST("/api/shorten/batch", handler.PostBatchURL(store, cfg.ShortenAddress))
+	r.GET("/api/user/urls", handler.GetUserURLs(store, cfg.ShortenAddress))
 	return r
 }
 
