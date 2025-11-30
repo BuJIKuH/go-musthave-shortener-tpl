@@ -43,9 +43,7 @@ func (d *Deleter) worker() {
 		}
 		group := make(map[string][]string)
 		for _, t := range tasks {
-			for _, id := range t.IDs {
-				group[t.UserID] = append(group[t.UserID], id)
-			}
+			group[t.UserID] = append(group[t.UserID], t.IDs...)
 		}
 		for uid, ids := range group {
 			_ = d.markFunc(uid, ids)
