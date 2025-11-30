@@ -7,6 +7,7 @@ import (
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/handler"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/middleware"
+	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/service"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -22,9 +23,14 @@ func main() {
 			newRouter,
 			NewLogger,
 			NewAuthManager,
+			NewDeleter,
 		),
 		fx.Invoke(startServer),
 	).Run()
+}
+
+func NewDeleter(store storage.Storage) *service.Deleter {
+	return service.NewDeleter(store.MarkDeleted)
 }
 
 func NewAuthManager(cfg *config.Config) *auth.Manager {
@@ -62,7 +68,7 @@ func newStorage(cfg *config.Config, logger *zap.Logger) (storage.Storage, error)
 	return storage.NewInMemoryStorage(), nil
 }
 
-func newRouter(cfg *config.Config, store storage.Storage, am *auth.Manager, logger *zap.Logger) *gin.Engine {
+func newRouter(cfg *config.Config, store storage.Storage, am *auth.Manager, deleter *service.Deleter, logger *zap.Logger) *gin.Engine {
 	r := gin.New()
 	r.Use(
 		middleware.Logger(logger),
@@ -76,6 +82,7 @@ func newRouter(cfg *config.Config, store storage.Storage, am *auth.Manager, logg
 	r.GET("/ping", handler.PingHandler(store))
 	r.POST("/api/shorten/batch", handler.PostBatchURL(store, cfg.ShortenAddress))
 	r.GET("/api/user/urls", handler.GetUserURLs(store, cfg.ShortenAddress))
+	r.DELETE("/api/user/urls", handler.DeleteUserURLs(store, deleter))
 	return r
 }
 

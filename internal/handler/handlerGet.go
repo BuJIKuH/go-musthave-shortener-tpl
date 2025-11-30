@@ -52,12 +52,18 @@ func GetIDURL(s storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 
-		originalURL, ok := s.Get(id)
-		if !ok {
+		rec, ok := s.Get(id)
+		if !ok || rec == nil {
 			c.String(http.StatusNotFound, "id not found")
 			return
 		}
-		c.Header("Location", originalURL)
-		c.Redirect(http.StatusTemporaryRedirect, originalURL)
+
+		if rec.Deleted {
+			c.Status(http.StatusGone)
+			return
+		}
+
+		c.Header("Location", rec.OriginalURL)
+		c.Redirect(http.StatusTemporaryRedirect, rec.OriginalURL)
 	}
 }

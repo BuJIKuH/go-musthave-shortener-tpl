@@ -75,9 +75,17 @@ func TestGetUserURLs(t *testing.T) {
 }
 
 func TestGetIDURL(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	store := storage.NewInMemoryStorage()
 
-	_, err := store.Save(context.Background(), "asdasd", "sdasda", "https://practicum.yandex.ru/")
+	_, err := store.Save(context.Background(), "user1", "alive123", "https://practicum.yandex.ru/")
+	assert.NoError(t, err)
+
+	_, err = store.Save(context.Background(), "user1", "dead123", "https://example.com/")
+	assert.NoError(t, err)
+
+	err = store.MarkDeleted("user1", []string{"dead123"})
 	assert.NoError(t, err)
 
 	router := gin.New()
@@ -93,14 +101,20 @@ func TestGetIDURL(t *testing.T) {
 		{
 			name:           "valid GET redirects",
 			method:         http.MethodGet,
-			path:           "/sdasda",
+			path:           "/alive123",
 			wantStatusCode: http.StatusTemporaryRedirect,
 			wantLocation:   "https://practicum.yandex.ru/",
 		},
 		{
+			name:           "deleted URL returns 410",
+			method:         http.MethodGet,
+			path:           "/dead123",
+			wantStatusCode: http.StatusGone,
+		},
+		{
 			name:           "unknown method",
 			method:         http.MethodPost,
-			path:           "/sdasda",
+			path:           "/alive123",
 			wantStatusCode: http.StatusNotFound,
 		},
 		{

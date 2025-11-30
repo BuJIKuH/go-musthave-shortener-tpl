@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 	"go.uber.org/zap"
 )
 
@@ -121,17 +121,24 @@ func (s *DBStorage) Save(ctx context.Context, userID, id, url string) (string, e
 	}
 }
 
-func (s *DBStorage) Get(id string) (string, bool) {
+func (s *DBStorage) Get(id string) (*URLRecord, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	query := `SELECT original_url FROM urls WHERE short_url = $1`
-	var original string
-	err := s.DB.QueryRowContext(ctx, query, id).Scan(&original)
+	query := `SELECT original_url, user_id, is_deleted FROM urls WHERE short_url = $1`
+	var original, userID string
+	var isDeleted bool
+	err := s.DB.QueryRowContext(ctx, query, id).Scan(&original, &userID, &isDeleted)
 	if err != nil {
-		s.Logger.Error("Failed to get record from DB", zap.Error(err))
-		return "", false
+		s.Logger.Debug("Get: not found or db error", zap.String("id", id), zap.Error(err))
+		return nil, false
 	}
-	return original, true
+	rec := &URLRecord{
+		ShortID:     id,
+		OriginalURL: original,
+		UserID:      userID,
+		Deleted:     isDeleted,
+	}
+	return rec, true
 }
 
 func (s *DBStorage) Ping(ctx context.Context) error {
@@ -165,4 +172,18 @@ func (s *DBStorage) GetUserURLs(ctx context.Context, userID string) ([]BatchItem
 	}
 
 	return result, nil
+}
+
+func (s *DBStorage) MarkDeleted(userID string, shorts []string) error {
+	if len(shorts) == 0 {
+		return nil
+	}
+
+	query := `
+        UPDATE urls
+        SET is_deleted = TRUE
+        WHERE user_id = $1 AND short_url = ANY($2)
+    `
+	_, err := s.DB.Exec(query, userID, pq.Array(shorts))
+	return err
 }

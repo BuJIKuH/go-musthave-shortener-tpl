@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func testUserMW() gin.HandlerFunc {
+func testUser() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Set("userID", "test-user")
 		c.Next()
@@ -25,7 +25,7 @@ func testUserMW() gin.HandlerFunc {
 func TestPostBatchURL(t *testing.T) {
 	baseURL := "http://localhost:8080"
 	router := gin.Default()
-	router.Use(testUserMW())
+	router.Use(testUser())
 	store := storage.NewInMemoryStorage()
 	router.POST("/api/shorten/batch", handler.PostBatchURL(store, baseURL))
 
@@ -83,7 +83,7 @@ func TestPostBatchURL(t *testing.T) {
 func TestPostRawURL(t *testing.T) {
 	baseURL := "http://localhost:8080"
 	router := gin.Default()
-	router.Use(testUserMW())
+	router.Use(testUser())
 	store := storage.NewInMemoryStorage()
 	router.POST("/", handler.PostRawURL(store, baseURL))
 
@@ -130,7 +130,7 @@ func TestPostRawURL(t *testing.T) {
 func TestPostJSONURL(t *testing.T) {
 	baseURL := "http://localhost:8080"
 	router := gin.Default()
-	router.Use(testUserMW())
+	router.Use(testUser())
 	store := storage.NewInMemoryStorage()
 	router.POST("/api/shorten", handler.PostJSONURL(store, baseURL))
 

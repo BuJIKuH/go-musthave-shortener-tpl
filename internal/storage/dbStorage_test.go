@@ -94,3 +94,83 @@ func TestDBStorage_SaveBatch(t *testing.T) {
 
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
+
+func TestDBStorage_Get(t *testing.T) {
+	logger, _ := zap.NewDevelopment()
+	db, mock, err := sqlmock.New()
+	assert.NoError(t, err)
+	defer db.Close()
+
+	s := &storage.DBStorage{DB: db, Logger: logger}
+
+	t.Run("existing ID", func(t *testing.T) {
+		mock.ExpectQuery("SELECT original_url, user_id, is_deleted FROM urls WHERE short_url = \\$1").
+			WithArgs("short1").
+			WillReturnRows(sqlmock.NewRows([]string{"original_url", "user_id", "is_deleted"}).
+				AddRow("https://example.com", "user123", false))
+
+		rec, ok := s.Get("short1")
+		assert.True(t, ok)
+		assert.Equal(t, "https://example.com", rec.OriginalURL)
+		assert.Equal(t, "user123", rec.UserID)
+		assert.False(t, rec.Deleted)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("non-existent ID", func(t *testing.T) {
+		mock.ExpectQuery("SELECT original_url, user_id, is_deleted FROM urls WHERE short_url = \\$1").
+			WithArgs("unknown").
+			WillReturnError(sql.ErrNoRows)
+
+		rec, ok := s.Get("unknown")
+		assert.False(t, ok)
+		assert.Nil(t, rec)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+func TestDBStorage_GetUserURLs(t *testing.T) {
+	logger, _ := zap.NewDevelopment()
+	db, mock, err := sqlmock.New()
+	assert.NoError(t, err)
+	defer db.Close()
+
+	s := &storage.DBStorage{DB: db, Logger: logger}
+	ctx := context.Background()
+	userID := "user123"
+
+	mock.ExpectQuery("SELECT short_url, original_url FROM urls WHERE user_id = \\$1").
+		WithArgs(userID).
+		WillReturnRows(sqlmock.NewRows([]string{"short_url", "original_url"}).
+			AddRow("shortA", "https://a.com").
+			AddRow("shortB", "https://b.com"))
+
+	urls, err := s.GetUserURLs(ctx, userID)
+	assert.NoError(t, err)
+	assert.Len(t, urls, 2)
+	assert.Equal(t, "shortA", urls[0].ShortID)
+	assert.Equal(t, "https://a.com", urls[0].OriginalURL)
+	assert.Equal(t, "shortB", urls[1].ShortID)
+	assert.Equal(t, "https://b.com", urls[1].OriginalURL)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestDBStorage_MarkDeleted(t *testing.T) {
+	logger, _ := zap.NewDevelopment()
+	db, mock, err := sqlmock.New()
+	assert.NoError(t, err)
+	defer db.Close()
+
+	s := &storage.DBStorage{DB: db, Logger: logger}
+
+	userID := "user123"
+	shorts := []string{"shortA", "shortB"}
+
+	mock.ExpectExec("UPDATE urls SET is_deleted = TRUE WHERE user_id = \\$1 AND short_url = ANY\\(\\$2\\)").
+		WithArgs(userID, sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(2, 2))
+
+	err = s.MarkDeleted(userID, shorts)
+	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
