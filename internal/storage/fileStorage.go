@@ -15,27 +15,27 @@ type ShortURLRecord struct {
 	UUID        int    `json:"uuid"`
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
+	Deleted     bool   `json:"deleted"`
 }
 
 type FileStorage struct {
 	mu              sync.RWMutex
 	path            string
 	file            *os.File
-	data            map[string]string
+	data            map[string]URLRecord
 	originalToShort map[string]string
+	userURLs        map[string][]BatchItem
 	logger          *zap.Logger
 	nextID          int
 }
 
-func (fs *FileStorage) Ping(ctx context.Context) error {
-	return nil
-}
-
 func NewFileStorage(path string, logger *zap.Logger) (*FileStorage, error) {
 	fs := &FileStorage{
-		path:   path,
-		data:   make(map[string]string),
-		logger: logger,
+		path:            path,
+		data:            make(map[string]URLRecord),
+		originalToShort: make(map[string]string),
+		userURLs:        make(map[string][]BatchItem),
+		logger:          logger,
 	}
 
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
@@ -59,64 +59,66 @@ func NewFileStorage(path string, logger *zap.Logger) (*FileStorage, error) {
 		return nil, err
 	}
 
-	logger.Info("File storage initialized", zap.String("path", path), zap.Int("count", len(fs.data)))
+	logger.Info("File storage initialized",
+		zap.String("path", path),
+		zap.Int("count", len(fs.data)))
+
 	return fs, nil
 }
 
-func (fs *FileStorage) SaveBatch(ctx context.Context, batch []BatchItem) (
-	map[string]string, map[string]string, error,
-) {
-	fs.mu.Lock()
-	defer fs.mu.Unlock()
+func (fs *FileStorage) load() error {
+	scanner := bufio.NewScanner(fs.file)
 
-	newMap := make(map[string]string)
-	conflictMap := make(map[string]string)
-
-	for _, item := range batch {
-		originalURL := item.OriginalURL
-		shortID := item.ShortID
-
-		if existing, ok := fs.originalToShort[originalURL]; ok {
-			conflictMap[originalURL] = existing
+	for scanner.Scan() {
+		var rec ShortURLRecord
+		if err := json.Unmarshal(scanner.Bytes(), &rec); err != nil {
+			fs.logger.Warn("invalid record",
+				zap.String("line", scanner.Text()),
+				zap.Error(err))
 			continue
 		}
 
-		fs.nextID++
-		fs.data[shortID] = originalURL
-		fs.originalToShort[originalURL] = shortID
-		newMap[originalURL] = shortID
-
-		rec := ShortURLRecord{
-			UUID:        fs.nextID,
-			ShortURL:    shortID,
-			OriginalURL: originalURL,
+		fs.data[rec.ShortURL] = URLRecord{
+			ShortID:     rec.ShortURL,
+			OriginalURL: rec.OriginalURL,
+			UserID:      "",
+			Deleted:     rec.Deleted,
 		}
+		fs.originalToShort[rec.OriginalURL] = rec.ShortURL
 
-		bytes, err := json.Marshal(rec)
-		if err == nil {
-			_, _ = fs.file.Write(append(bytes, '\n'))
+		if rec.UUID > fs.nextID {
+			fs.nextID = rec.UUID
 		}
 	}
 
-	return newMap, conflictMap, nil
+	return scanner.Err()
 }
 
-func (fs *FileStorage) Save(ctx context.Context, id, url string) (string, error) {
+func (fs *FileStorage) Save(ctx context.Context, userID, id, url string) (string, error) {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
-	if existing, ok := fs.originalToShort[id]; ok {
+	if existing, ok := fs.originalToShort[url]; ok {
 		return existing, nil
 	}
 
 	fs.nextID++
-	fs.data[id] = url
-
 	rec := ShortURLRecord{
 		UUID:        fs.nextID,
 		ShortURL:    id,
 		OriginalURL: url,
+		Deleted:     false,
 	}
+
+	// save in-memory
+	fs.data[id] = URLRecord{
+		ShortID:     id,
+		OriginalURL: url,
+		UserID:      userID,
+		Deleted:     false,
+	}
+	fs.originalToShort[url] = id
+	fs.userURLs[userID] = append(fs.userURLs[userID], BatchItem{ShortID: id, OriginalURL: url})
 
 	bytes, err := json.Marshal(rec)
 	if err != nil {
@@ -128,32 +130,97 @@ func (fs *FileStorage) Save(ctx context.Context, id, url string) (string, error)
 		fs.logger.Error("Failed to append record to file", zap.Error(err))
 		return "", err
 	}
-	fs.logger.Info("Saved record", zap.String("short", id), zap.String("url", url))
 	return id, nil
 }
 
-func (fs *FileStorage) Get(id string) (string, bool) {
-	fs.mu.RLock()
-	defer fs.mu.RUnlock()
-	url, ok := fs.data[id]
-	return url, ok
-}
+func (fs *FileStorage) SaveBatch(ctx context.Context, userID string, batch []BatchItem) (map[string]string, map[string]string, error) {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
 
-func (fs *FileStorage) load() error {
-	scanner := bufio.NewScanner(fs.file)
-	for scanner.Scan() {
-		var rec ShortURLRecord
-		if err := json.Unmarshal(scanner.Bytes(), &rec); err != nil {
-			fs.logger.Warn("invalid record", zap.String("line", scanner.Text()), zap.Error(err))
+	newMap := make(map[string]string)
+	conflictMap := make(map[string]string)
+
+	for _, item := range batch {
+		if existing, ok := fs.originalToShort[item.OriginalURL]; ok {
+			conflictMap[item.OriginalURL] = existing
 			continue
 		}
-		fs.data[rec.ShortURL] = rec.OriginalURL
-		if rec.UUID > fs.nextID {
-			fs.nextID = rec.UUID
+		fs.nextID++
+		rec := ShortURLRecord{
+			UUID:        fs.nextID,
+			ShortURL:    item.ShortID,
+			OriginalURL: item.OriginalURL,
+			Deleted:     false,
 		}
+		fs.data[item.ShortID] = URLRecord{
+			ShortID:     item.ShortID,
+			OriginalURL: item.OriginalURL,
+			UserID:      userID,
+			Deleted:     false,
+		}
+		fs.originalToShort[item.OriginalURL] = item.ShortID
+		fs.userURLs[userID] = append(fs.userURLs[userID], item)
+
+		bytes, _ := json.Marshal(rec)
+		_, _ = fs.file.Write(append(bytes, '\n'))
+		newMap[item.OriginalURL] = item.ShortID
 	}
 
-	return scanner.Err()
+	return newMap, conflictMap, nil
+}
+
+func (fs *FileStorage) Get(id string) (*URLRecord, bool) {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+	rec, ok := fs.data[id]
+	if !ok {
+		return nil, false
+	}
+	c := rec
+	return &c, true
+}
+
+func (fs *FileStorage) GetUserURLs(ctx context.Context, userID string) ([]BatchItem, error) {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+	list, ok := fs.userURLs[userID]
+	if !ok || len(list) == 0 {
+		return nil, nil
+	}
+	return list, nil
+}
+
+func (fs *FileStorage) MarkDeleted(userID string, shorts []string) error {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+
+	for _, s := range shorts {
+		rec, ok := fs.data[s]
+		if !ok {
+			continue
+		}
+		if rec.UserID != userID {
+			continue
+		}
+		rec.Deleted = true
+		fs.data[s] = rec
+
+		fs.nextID++
+		out := ShortURLRecord{
+			UUID:        fs.nextID,
+			ShortURL:    rec.ShortID,
+			OriginalURL: rec.OriginalURL,
+			Deleted:     true,
+		}
+		bytes, _ := json.Marshal(out)
+		_, _ = fs.file.Write(append(bytes, '\n'))
+	}
+
+	return nil
+}
+
+func (fs *FileStorage) Ping(ctx context.Context) error {
+	return nil
 }
 
 func (fs *FileStorage) Close() error {
