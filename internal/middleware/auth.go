@@ -11,17 +11,24 @@ import (
 
 const userIDKey = "userID"
 
+func generateToken(am *auth.Manager, logger *zap.Logger) (newID, newToken string, err error) {
+	newID = uuid.NewString()
+	token, err := am.GenerateToken(newID)
+	if err != nil {
+		logger.Error("failed to generate token", zap.Error(err))
+		return
+	}
+	return newID, token, nil
+}
+
 func AuthMiddleware(am *auth.Manager, logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		cookie, err := c.Cookie("auth_token")
 
 		if err != nil || cookie == "" {
-			newID := uuid.NewString()
-
-			token, err := am.GenerateToken(newID)
+			newID, token, err := generateToken(am, logger)
 			if err != nil {
-				logger.Error("failed to generate token", zap.Error(err))
 				c.AbortWithStatus(http.StatusInternalServerError)
 				return
 			}
@@ -41,11 +48,8 @@ func AuthMiddleware(am *auth.Manager, logger *zap.Logger) gin.HandlerFunc {
 
 		userID, err := am.ParseToken(cookie, logger)
 		if err != nil || userID == "" {
-			newID := uuid.NewString()
-
-			token, err := am.GenerateToken(newID)
+			newID, token, err := generateToken(am, logger)
 			if err != nil {
-				logger.Error("failed to generate token", zap.Error(err))
 				c.AbortWithStatus(http.StatusInternalServerError)
 				return
 			}

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"log"
+	"net/http"
 
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/auth"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config"
@@ -29,8 +31,18 @@ func main() {
 	).Run()
 }
 
-func NewDeleter(store storage.Storage) *service.Deleter {
-	return service.NewDeleter(store.MarkDeleted)
+func NewDeleter(lc fx.Lifecycle, store storage.Storage, logger *zap.Logger) *service.Deleter {
+	d := service.NewDeleter(store.MarkDeleted)
+
+	lc.Append(fx.Hook{
+		OnStop: func(ctx context.Context) error {
+			logger.Info("Shutting down deleter gracefully...")
+			d.Close()
+			return nil
+		},
+	})
+
+	return d
 }
 
 func NewAuthManager(cfg *config.Config) *auth.Manager {
@@ -86,12 +98,27 @@ func newRouter(cfg *config.Config, store storage.Storage, am *auth.Manager, dele
 	return r
 }
 
-func startServer(cfg *config.Config, r *gin.Engine, logger *zap.Logger) {
-	logger.Info("starting server",
-		zap.String("address", cfg.Address),
-		zap.String("short address", cfg.ShortenAddress))
+func startServer(lc fx.Lifecycle, cfg *config.Config, r *gin.Engine, logger *zap.Logger) {
 
-	if err := r.Run(cfg.Address); err != nil {
-		logger.Fatal("Server startup failed", zap.Error(err))
+	srv := &http.Server{
+		Addr:    cfg.Address,
+		Handler: r,
 	}
+
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			logger.Info("Starting HTTP server", zap.String("address", cfg.Address))
+
+			go func() {
+				if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+					logger.Fatal("HTTP server error", zap.Error(err))
+				}
+			}()
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			logger.Info("Stopping HTTP server...")
+			return srv.Shutdown(ctx)
+		},
+	})
 }
