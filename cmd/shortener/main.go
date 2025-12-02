@@ -1,11 +1,15 @@
 package main
 
 import (
+	"context"
 	"log"
+	"net/http"
 
+	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/auth"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/handler"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/middleware"
+	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/service"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -20,9 +24,29 @@ func main() {
 			newStorage,
 			newRouter,
 			NewLogger,
+			NewAuthManager,
+			NewDeleter,
 		),
 		fx.Invoke(startServer),
 	).Run()
+}
+
+func NewDeleter(lc fx.Lifecycle, store storage.Storage, logger *zap.Logger) *service.Deleter {
+	d := service.NewDeleter(store.MarkDeleted)
+
+	lc.Append(fx.Hook{
+		OnStop: func(ctx context.Context) error {
+			logger.Info("Shutting down deleter gracefully...")
+			d.Close()
+			return nil
+		},
+	})
+
+	return d
+}
+
+func NewAuthManager(cfg *config.Config) *auth.Manager {
+	return auth.NewManager(cfg.AuthSecret)
 }
 
 func NewLogger() (*zap.Logger, error) {
@@ -56,11 +80,12 @@ func newStorage(cfg *config.Config, logger *zap.Logger) (storage.Storage, error)
 	return storage.NewInMemoryStorage(), nil
 }
 
-func newRouter(cfg *config.Config, store storage.Storage, logger *zap.Logger) *gin.Engine {
+func newRouter(cfg *config.Config, store storage.Storage, am *auth.Manager, deleter *service.Deleter, logger *zap.Logger) *gin.Engine {
 	r := gin.New()
 	r.Use(
 		middleware.Logger(logger),
 		middleware.GzipMiddleware(logger),
+		middleware.AuthMiddleware(am, logger),
 	)
 
 	r.POST("/", handler.PostRawURL(store, cfg.ShortenAddress))
@@ -68,15 +93,32 @@ func newRouter(cfg *config.Config, store storage.Storage, logger *zap.Logger) *g
 	r.POST("/api/shorten", handler.PostJSONURL(store, cfg.ShortenAddress))
 	r.GET("/ping", handler.PingHandler(store))
 	r.POST("/api/shorten/batch", handler.PostBatchURL(store, cfg.ShortenAddress))
+	r.GET("/api/user/urls", handler.GetUserURLs(store, cfg.ShortenAddress))
+	r.DELETE("/api/user/urls", handler.DeleteUserURLs(store, deleter))
 	return r
 }
 
-func startServer(cfg *config.Config, r *gin.Engine, logger *zap.Logger) {
-	logger.Info("starting server",
-		zap.String("address", cfg.Address),
-		zap.String("short address", cfg.ShortenAddress))
+func startServer(lc fx.Lifecycle, cfg *config.Config, r *gin.Engine, logger *zap.Logger) {
 
-	if err := r.Run(cfg.Address); err != nil {
-		logger.Fatal("Server startup failed", zap.Error(err))
+	srv := &http.Server{
+		Addr:    cfg.Address,
+		Handler: r,
 	}
+
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			logger.Info("Starting HTTP server", zap.String("address", cfg.Address))
+
+			go func() {
+				if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+					logger.Fatal("HTTP server error", zap.Error(err))
+				}
+			}()
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			logger.Info("Stopping HTTP server...")
+			return srv.Shutdown(ctx)
+		},
+	})
 }

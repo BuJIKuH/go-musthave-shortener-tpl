@@ -23,7 +23,6 @@ func GzipMiddleware(logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var gr *gzip.Reader
 
-		// ---------- 1. Декодирование gzip-запроса ----------
 		if strings.Contains(c.GetHeader("Content-Encoding"), "gzip") {
 			reader, err := gzip.NewReader(c.Request.Body)
 			if err != nil {
@@ -40,7 +39,6 @@ func GzipMiddleware(logger *zap.Logger) gin.HandlerFunc {
 				zap.String("method", c.Request.Method))
 		}
 
-		// ---------- 2. Подготовка gzip-ответа ----------
 		if strings.Contains(c.GetHeader("Accept-Encoding"), "gzip") {
 			gz := gzip.NewWriter(c.Writer)
 			c.Writer = &gzipWriter{ResponseWriter: c.Writer, Writer: gz}
@@ -57,7 +55,6 @@ func GzipMiddleware(logger *zap.Logger) gin.HandlerFunc {
 				zap.String("method", c.Request.Method))
 		}
 
-		// ---------- 3. Продолжить выполнение ----------
 		c.Next()
 	}
 }
