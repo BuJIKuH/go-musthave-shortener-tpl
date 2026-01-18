@@ -16,6 +16,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
+
+	_ "net/http/pprof"
 )
 
 func main() {
@@ -138,6 +140,13 @@ func startServer(lc fx.Lifecycle, cfg *config.Config, r *gin.Engine, logger *zap
 			go func() {
 				if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 					logger.Fatal("HTTP server error", zap.Error(err))
+				}
+			}()
+
+			go func() {
+				logger.Info("Starting pprof server on :6060")
+				if err := http.ListenAndServe("localhost:6060", nil); err != nil {
+					logger.Fatal("pprof server error: %v", zap.Error(err))
 				}
 			}()
 			return nil
