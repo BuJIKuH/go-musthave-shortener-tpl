@@ -28,17 +28,17 @@ func (o *HTTPObserver) Notify(ctx context.Context, event Event) error {
 		return err
 	}
 
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		o.url,
-		bytes.NewReader(data),
-	)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, o.url, bytes.NewReader(data))
 	if err != nil {
 		return err
 	}
-
 	req.Header.Set("Content-Type", "application/json")
-	_, err = o.client.Do(req)
-	return err
+
+	resp, err := o.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	return nil
 }
