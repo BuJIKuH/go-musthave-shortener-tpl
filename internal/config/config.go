@@ -14,10 +14,20 @@ type Config struct {
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	DatabaseDSN     string `env:"DATABASE_DSN"`
 	AuthSecret      string `env:"AUTH_SECRET"`
+	AuditFile       string `json:"AUDIT_FILE"`
+	AuditURL        string `json:"AUDIT_URL"`
 }
 
 func (f *Config) String() string {
-	return fmt.Sprintf("--a %s --b %s --f %s --d %s", f.Address, f.ShortenAddress, f.FileStoragePath, f.DatabaseDSN)
+	return fmt.Sprintf(
+		"--a %s --b %s --f %s --d %s --af %s --au %s",
+		f.Address,
+		f.ShortenAddress,
+		f.FileStoragePath,
+		f.DatabaseDSN,
+		f.AuditFile,
+		f.AuditURL,
+	)
 }
 
 func InitConfig() *Config {
@@ -34,6 +44,8 @@ func InitConfig() *Config {
 	flag.StringVar(&cfg.ShortenAddress, "b", "", "Base URL for shortened links")
 	flag.StringVar(&cfg.FileStoragePath, "f", "", "File storage path")
 	flag.StringVar(&cfg.DatabaseDSN, "d", "", "Database DNS")
+	flag.StringVar(&cfg.AuditFile, "audit-file", "", "audit log file path")
+	flag.StringVar(&cfg.AuditURL, "audit-url", "", "audit http endpoint")
 	flag.Parse()
 
 	envAddress := os.Getenv("SERVER_ADDRESS")
@@ -41,6 +53,16 @@ func InitConfig() *Config {
 	envStoragePath := os.Getenv("FILE_STORAGE_PATH")
 	envDatabaseDNS := os.Getenv("DATABASE_DNS")
 	envAuthSecret := os.Getenv("AUTH_SECRET")
+	envAuditFile := os.Getenv("AUDIT_FILE")
+	envAuditURL := os.Getenv("AUDIT_URL")
+
+	if envAuditFile != "" {
+		cfg.AuditFile = envAuditFile
+	}
+
+	if envAuditURL != "" {
+		cfg.AuditURL = envAuditURL
+	}
 
 	if envAuthSecret != "" {
 		cfg.AuthSecret = envAuthSecret

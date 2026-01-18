@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/audit"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/auth"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/handler"
@@ -26,9 +27,28 @@ func main() {
 			NewLogger,
 			NewAuthManager,
 			NewDeleter,
+			NewAuditService,
 		),
 		fx.Invoke(startServer),
 	).Run()
+}
+
+func NewAuditService(cfg *config.Config) *audit.Service {
+	var observers []audit.Observer
+
+	if cfg.AuditFile != "" {
+		fo, err := audit.NewFileObserver(cfg.AuditFile)
+		if err != nil {
+			log.Fatalf("failed to init audit file observer: %v", err)
+		}
+		observers = append(observers, fo)
+	}
+
+	if cfg.AuditURL != "" {
+		observers = append(observers, audit.NewHTTPObserver(cfg.AuditURL))
+	}
+
+	return audit.NewService(observers...)
 }
 
 func NewDeleter(lc fx.Lifecycle, store storage.Storage, logger *zap.Logger) *service.Deleter {
@@ -80,7 +100,13 @@ func newStorage(cfg *config.Config, logger *zap.Logger) (storage.Storage, error)
 	return storage.NewInMemoryStorage(), nil
 }
 
-func newRouter(cfg *config.Config, store storage.Storage, am *auth.Manager, deleter *service.Deleter, logger *zap.Logger) *gin.Engine {
+func newRouter(
+	cfg *config.Config,
+	store storage.Storage,
+	am *auth.Manager,
+	deleter *service.Deleter,
+	auditSvc *audit.Service,
+	logger *zap.Logger) *gin.Engine {
 	r := gin.New()
 	r.Use(
 		middleware.Logger(logger),
@@ -88,9 +114,9 @@ func newRouter(cfg *config.Config, store storage.Storage, am *auth.Manager, dele
 		middleware.AuthMiddleware(am, logger),
 	)
 
-	r.POST("/", handler.PostRawURL(store, cfg.ShortenAddress))
-	r.GET("/:id", handler.GetIDURL(store))
-	r.POST("/api/shorten", handler.PostJSONURL(store, cfg.ShortenAddress))
+	r.POST("/", handler.PostRawURL(store, cfg.ShortenAddress, auditSvc))
+	r.GET("/:id", handler.GetIDURL(store, auditSvc))
+	r.POST("/api/shorten", handler.PostJSONURL(store, cfg.ShortenAddress, auditSvc))
 	r.GET("/ping", handler.PingHandler(store))
 	r.POST("/api/shorten/batch", handler.PostBatchURL(store, cfg.ShortenAddress))
 	r.GET("/api/user/urls", handler.GetUserURLs(store, cfg.ShortenAddress))

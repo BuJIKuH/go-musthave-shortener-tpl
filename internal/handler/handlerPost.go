@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/audit"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/service/shortener"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/storage"
 	"github.com/gin-gonic/gin"
@@ -91,7 +92,7 @@ func PostBatchURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 	}
 }
 
-func PostJSONURL(s storage.Storage, baseURL string) gin.HandlerFunc {
+func PostJSONURL(s storage.Storage, baseURL string, auditSvc *audit.Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
 		defer cancel()
@@ -105,6 +106,7 @@ func PostJSONURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "url is required"})
 			return
 		}
+		originalURL := strings.TrimSpace(req.URL)
 
 		u, _ := c.Get("userID")
 		userID := u.(string)
@@ -129,10 +131,17 @@ func PostJSONURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 
 		shortURL := fmt.Sprintf("%s/%s", strings.TrimRight(baseURL, "/"), shortID)
 		c.JSON(http.StatusCreated, ResponseJSON{Result: shortURL})
+
+		auditSvc.Notify(
+			c.Request.Context(),
+			audit.Event{TS: time.Now().Unix(),
+				Action: "shorten",
+				UserID: getUserID(c),
+				URL:    originalURL})
 	}
 }
 
-func PostRawURL(s storage.Storage, baseURL string) gin.HandlerFunc {
+func PostRawURL(s storage.Storage, baseURL string, auditSvc *audit.Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.GetHeader("Content-Type") != "text/plain" {
 			c.String(http.StatusBadRequest, "invalid content type")
@@ -173,5 +182,13 @@ func PostRawURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 
 		shortURL := fmt.Sprintf("%s/%s", strings.TrimRight(baseURL, "/"), shortID)
 		c.String(http.StatusCreated, shortURL)
+
+		auditSvc.Notify(
+			c.Request.Context(),
+			audit.Event{
+				TS:     time.Now().Unix(),
+				Action: "shorten",
+				UserID: getUserID(c),
+				URL:    originalURL})
 	}
 }

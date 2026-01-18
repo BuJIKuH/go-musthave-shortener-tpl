@@ -3,7 +3,9 @@ package handler
 import (
 	"fmt"
 	"net/http"
+	"time"
 
+	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/audit"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/storage"
 	"github.com/gin-gonic/gin"
 )
@@ -48,7 +50,7 @@ func GetUserURLs(s storage.Storage, baseURL string) gin.HandlerFunc {
 	}
 }
 
-func GetIDURL(s storage.Storage) gin.HandlerFunc {
+func GetIDURL(s storage.Storage, auditSvc *audit.Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 
@@ -65,5 +67,13 @@ func GetIDURL(s storage.Storage) gin.HandlerFunc {
 
 		c.Header("Location", rec.OriginalURL)
 		c.Redirect(http.StatusTemporaryRedirect, rec.OriginalURL)
+
+		auditSvc.Notify(
+			c.Request.Context(),
+			audit.Event{TS: time.Now().Unix(),
+				Action: "follow",
+				UserID: getUserID(c),
+				URL:    rec.OriginalURL,
+			})
 	}
 }

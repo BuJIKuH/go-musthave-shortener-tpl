@@ -1,0 +1,44 @@
+package audit
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"net/http"
+	"time"
+)
+
+type HTTPObserver struct {
+	url    string
+	client *http.Client
+}
+
+func NewHTTPObserver(url string) *HTTPObserver {
+	return &HTTPObserver{
+		url: url,
+		client: &http.Client{
+			Timeout: 5 * time.Second,
+		},
+	}
+}
+
+func (o *HTTPObserver) Notify(ctx context.Context, event Event) error {
+	data, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		o.url,
+		bytes.NewReader(data),
+	)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	_, err = o.client.Do(req)
+	return err
+}
