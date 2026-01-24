@@ -10,12 +10,16 @@ import (
 	"go.uber.org/zap"
 )
 
+// HTTPObserver отправляет события аудита на внешний HTTP-эндпоинт.
+// Используется для интеграции с внешними системами логирования или мониторинга.
 type HTTPObserver struct {
-	url    string
-	client *http.Client
-	logger *zap.Logger
+	url    string       // URL, на который отправляются события
+	client *http.Client // HTTP-клиент для отправки запросов
+	logger *zap.Logger  // Logger для ошибок и предупреждений
 }
 
+// NewHTTPObserver создаёт нового HTTPObserver с указанным URL и логгером.
+// Если logger равен nil, используется zap.NewNop() — логгер-заглушка.
 func NewHTTPObserver(url string, logger *zap.Logger) *HTTPObserver {
 	if logger == nil {
 		logger = zap.NewNop()
@@ -30,6 +34,9 @@ func NewHTTPObserver(url string, logger *zap.Logger) *HTTPObserver {
 	}
 }
 
+// Notify отправляет событие e на сконфигурированный URL.
+// В случае ошибки при маршалинге или отправке запроса логирует ошибку через zap.Logger.
+// Возвращает ошибку, если событие не удалось отправить.
 func (o *HTTPObserver) Notify(ctx context.Context, event Event) error {
 	data, err := json.Marshal(event)
 	if err != nil {

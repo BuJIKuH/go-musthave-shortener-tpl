@@ -1,3 +1,5 @@
+// Package main запускает сервис сокращения URL с поддержкой аудита,
+// логирования, pprof и встроенной авторизации.
 package main
 
 import (
@@ -35,6 +37,10 @@ func main() {
 	).Run()
 }
 
+// NewAuditService создает сервис аудита с указанными наблюдателями.
+// cfg — конфигурация приложения.
+// logger — Zap логгер для записи ошибок и событий.
+// Возвращает новый экземпляр *audit.Service.
 func NewAuditService(cfg *config.Config, logger *zap.Logger) *audit.Service {
 	var observers []audit.Observer
 
@@ -53,6 +59,11 @@ func NewAuditService(cfg *config.Config, logger *zap.Logger) *audit.Service {
 	return audit.NewService(logger, observers...)
 }
 
+// NewDeleter создает сервис Deleter для пометки URL как удаленных.
+// lc — fx.Lifecycle для регистрации graceful shutdown.
+// store — интерфейс хранилища.
+// logger — Zap логгер для логирования действий.
+// Возвращает новый *service.Deleter.
 func NewDeleter(lc fx.Lifecycle, store storage.Storage, logger *zap.Logger) *service.Deleter {
 	d := service.NewDeleter(store.MarkDeleted)
 
@@ -67,10 +78,15 @@ func NewDeleter(lc fx.Lifecycle, store storage.Storage, logger *zap.Logger) *ser
 	return d
 }
 
+// NewAuthManager создает менеджер авторизации.
+// cfg — конфигурация с секретным ключом авторизации.
+// Возвращает *auth.Manager.
 func NewAuthManager(cfg *config.Config) *auth.Manager {
 	return auth.NewManager(cfg.AuthSecret)
 }
 
+// NewLogger инициализирует Zap Logger в production-режиме.
+// Возвращает *zap.Logger и ошибку инициализации.
 func NewLogger() (*zap.Logger, error) {
 	logger, err := zap.NewProduction()
 	if err != nil {
@@ -80,6 +96,10 @@ func NewLogger() (*zap.Logger, error) {
 	return logger, nil
 }
 
+// newStorage создает и возвращает хранилище для URL.
+// cfg — конфигурация приложения.
+// logger — Zap логгер.
+// Возвращает storage.Storage и ошибку при инициализации.
 func newStorage(cfg *config.Config, logger *zap.Logger) (storage.Storage, error) {
 	if cfg.DatabaseDSN != "" {
 		if err := storage.RunMigrations(cfg.DatabaseDSN, logger); err != nil {
@@ -102,6 +122,14 @@ func newStorage(cfg *config.Config, logger *zap.Logger) (storage.Storage, error)
 	return storage.NewInMemoryStorage(), nil
 }
 
+// newRouter создает и настраивает маршрутизатор Gin.
+// cfg — конфигурация приложения.
+// store — интерфейс хранилища.
+// am — менеджер авторизации.
+// deleter — сервис Deleter для удаления URL.
+// auditSvc — сервис аудита.
+// logger — Zap логгер.
+// Возвращает *gin.Engine.
 func newRouter(
 	cfg *config.Config,
 	store storage.Storage,
@@ -109,6 +137,7 @@ func newRouter(
 	deleter *service.Deleter,
 	auditSvc *audit.Service,
 	logger *zap.Logger) *gin.Engine {
+
 	r := gin.New()
 	r.Use(
 		middleware.Logger(logger),
@@ -126,6 +155,11 @@ func newRouter(
 	return r
 }
 
+// startServer запускает HTTP сервер и pprof сервер.
+// lc — fx.Lifecycle для graceful shutdown.
+// cfg — конфигурация приложения.
+// r — маршрутизатор Gin.
+// logger — Zap логгер.
 func startServer(lc fx.Lifecycle, cfg *config.Config, r *gin.Engine, logger *zap.Logger) {
 
 	srv := &http.Server{

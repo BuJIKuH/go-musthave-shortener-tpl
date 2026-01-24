@@ -6,12 +6,18 @@ import (
 	"go.uber.org/zap"
 )
 
+// Service обеспечивает асинхронное уведомление наблюдателей об аудиторских событиях.
+// События помещаются в буферизированный канал и обрабатываются в отдельной горутине.
+// Если канал переполнен, событие теряется с записью предупреждения в логгер.
 type Service struct {
-	observers []Observer
-	events    chan Event
-	logger    *zap.Logger
+	observers []Observer  // список наблюдателей
+	events    chan Event  // буферизированный канал для событий
+	logger    *zap.Logger // логгер для ошибок и предупреждений
 }
 
+// NewService создаёт новый сервис аудита с указанным логгером и списком наблюдателей.
+// Логгер не может быть nil, иначе паника при попытке логирования.
+// Обработчик событий запускается в отдельной горутине.
 func NewService(logger *zap.Logger, observers ...Observer) *Service {
 	s := &Service{
 		observers: observers,
@@ -39,6 +45,8 @@ func NewService(logger *zap.Logger, observers ...Observer) *Service {
 	return s
 }
 
+// Notify помещает событие e в очередь для асинхронной отправки наблюдателям.
+// Если очередь переполнена, событие теряется, а предупреждение логируется.
 func (s *Service) Notify(ctx context.Context, e Event) {
 	select {
 	case s.events <- e:

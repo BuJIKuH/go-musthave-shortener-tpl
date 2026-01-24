@@ -33,6 +33,24 @@ type BatchResponseItem struct {
 	ShortURL      string `json:"short_url"`
 }
 
+// PostBatchURL возвращает Gin handler для массового сокращения URL.
+//
+// Параметры:
+//   - s: интерфейс storage.Storage для сохранения URL
+//   - baseURL: базовый адрес для формирования коротких ссылок
+//
+// Логика хендлера:
+//  1. Проверяет наличие userID в контексте.
+//  2. Декодирует JSON-массив BatchRequestItem.
+//  3. Генерирует короткие ID для каждого URL.
+//  4. Сохраняет batch в хранилище.
+//  5. Возвращает JSON-массив BatchResponseItem с короткими ссылками.
+//
+// HTTP ответы:
+//   - 201 Created — успешно сохранён batch.
+//   - 400 Bad Request — пустой массив или некорректный JSON.
+//   - 401 Unauthorized — отсутствует userID.
+//   - 500 Internal Server Error — ошибка генерации ID или сохранения batch.
 func PostBatchURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
@@ -92,6 +110,25 @@ func PostBatchURL(s storage.Storage, baseURL string) gin.HandlerFunc {
 	}
 }
 
+// PostJSONURL возвращает Gin handler для сокращения одного URL через JSON.
+//
+// Параметры:
+//   - s: интерфейс storage.Storage
+//   - baseURL: базовый адрес коротких ссылок
+//   - auditSvc: сервис audit.Service для логирования действий
+//
+// Логика хендлера:
+//  1. Декодирует JSON с полем "url".
+//  2. Генерирует короткий ID.
+//  3. Сохраняет URL в хранилище.
+//  4. Возвращает JSON с полем "result" — короткая ссылка.
+//  5. Отправляет событие в audit сервис.
+//
+// HTTP ответы:
+//   - 201 Created — успешное создание новой короткой ссылки.
+//   - 409 Conflict — URL уже существует, возвращается существующая короткая ссылка.
+//   - 400 Bad Request — пустой или некорректный JSON.
+//   - 500 Internal Server Error — ошибка генерации ID или сохранения URL.
 func PostJSONURL(s storage.Storage, baseURL string, auditSvc *audit.Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
@@ -141,6 +178,26 @@ func PostJSONURL(s storage.Storage, baseURL string, auditSvc *audit.Service) gin
 	}
 }
 
+// PostRawURL возвращает Gin handler для сокращения одного URL из текста.
+//
+// Параметры:
+//   - s: интерфейс storage.Storage
+//   - baseURL: базовый адрес коротких ссылок
+//   - auditSvc: сервис audit.Service для логирования действий
+//
+// Логика хендлера:
+//  1. Проверяет Content-Type "text/plain".
+//  2. Читает тело запроса и проверяет на пустоту.
+//  3. Генерирует короткий ID.
+//  4. Сохраняет URL в хранилище.
+//  5. Возвращает короткую ссылку как plain text.
+//  6. Отправляет событие в audit сервис.
+//
+// HTTP ответы:
+//   - 201 Created — успешно создана короткая ссылка.
+//   - 409 Conflict — URL уже существует, возвращается существующая короткая ссылка.
+//   - 400 Bad Request — пустое тело или некорректный Content-Type.
+//   - 500 Internal Server Error — ошибка генерации ID или сохранения URL.
 func PostRawURL(s storage.Storage, baseURL string, auditSvc *audit.Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.GetHeader("Content-Type") != "text/plain" {

@@ -10,15 +10,28 @@ import (
 	"go.uber.org/zap"
 )
 
+// gzipWriter оборачивает gin.ResponseWriter и записывает сжатые данные в Writer.
 type gzipWriter struct {
 	gin.ResponseWriter
 	Writer io.Writer
 }
 
+// Write записывает данные в сжатый поток.
 func (g *gzipWriter) Write(data []byte) (int, error) {
 	return g.Writer.Write(data)
 }
 
+// GzipMiddleware возвращает Gin middleware для сжатия и разжатия HTTP-трафика.
+//
+// Поведение:
+// 1. Если клиент прислал заголовок "Content-Encoding: gzip", middleware разжимает тело запроса.
+// 2. Если клиент поддерживает "Accept-Encoding: gzip", middleware сжимает тело ответа.
+// 3. Логи ошибок и операций пишутся в переданный zap.Logger.
+//
+// Пример использования:
+//
+//	r := gin.New()
+//	r.Use(GzipMiddleware(logger))
 func GzipMiddleware(logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var gr *gzip.Reader

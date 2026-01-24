@@ -8,6 +8,8 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// Config holds the configuration settings for the URL shortener service.
+// Fields include server address, base URL, storage paths, and auth secret.
 type Config struct {
 	Address         string `env:"SERVER_ADDRESS"`
 	ShortenAddress  string `env:"BASE_URL"`
@@ -18,6 +20,7 @@ type Config struct {
 	AuditURL        string `json:"AUDIT_URL"`
 }
 
+// String returns a string representation of the config for logging or debugging.
 func (f *Config) String() string {
 	return fmt.Sprintf(
 		"--a %s --b %s --f %s --d %s --af %s --au %s",
@@ -30,6 +33,8 @@ func (f *Config) String() string {
 	)
 }
 
+// InitConfig initializes and returns the service configuration.
+// It parses flags and environment variables, falling back to defaults.
 func InitConfig() *Config {
 	var cfg Config
 	if err := godotenv.Load(); err != nil {
