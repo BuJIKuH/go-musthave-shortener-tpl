@@ -35,11 +35,11 @@ func main() {
 	).Run()
 }
 
-func NewAuditService(cfg *config.Config) *audit.Service {
+func NewAuditService(cfg *config.Config, logger *zap.Logger) *audit.Service {
 	var observers []audit.Observer
 
 	if cfg.AuditFile != "" {
-		fo, err := audit.NewFileObserver(cfg.AuditFile)
+		fo, err := audit.NewFileObserver(cfg.AuditFile, logger)
 		if err != nil {
 			log.Fatalf("failed to init audit file observer: %v", err)
 		}
@@ -47,10 +47,10 @@ func NewAuditService(cfg *config.Config) *audit.Service {
 	}
 
 	if cfg.AuditURL != "" {
-		observers = append(observers, audit.NewHTTPObserver(cfg.AuditURL))
+		observers = append(observers, audit.NewHTTPObserver(cfg.AuditURL, logger))
 	}
 
-	return audit.NewService(observers...)
+	return audit.NewService(logger, observers...)
 }
 
 func NewDeleter(lc fx.Lifecycle, store storage.Storage, logger *zap.Logger) *service.Deleter {

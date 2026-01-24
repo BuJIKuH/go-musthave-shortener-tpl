@@ -7,13 +7,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/audit"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/handler"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )
 
+// --- TEST GET /api/user/urls ---
 func TestGetUserURLs(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -21,8 +21,8 @@ func TestGetUserURLs(t *testing.T) {
 
 	// pre-fill data for a user
 	userID := "user123"
-	store.Save(context.Background(), userID, "abc123", "https://ya.ru")
-	store.Save(context.Background(), userID, "xyz789", "https://google.com")
+	_, _ = store.Save(context.Background(), userID, "abc123", "https://ya.ru")
+	_, _ = store.Save(context.Background(), userID, "xyz789", "https://google.com")
 
 	router := gin.New()
 	router.GET("/api/user/urls", func(c *gin.Context) {
@@ -44,7 +44,6 @@ func TestGetUserURLs(t *testing.T) {
 
 		var actual []map[string]string
 		assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &actual))
-
 		assert.ElementsMatch(t, expected, actual)
 	})
 
@@ -75,16 +74,19 @@ func TestGetUserURLs(t *testing.T) {
 	})
 }
 
+// --- TEST GET /:id ---
 func TestGetIDURL(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	store := storage.NewInMemoryStorage()
-	auditSvc := audit.NewService(&noopObserver{})
+	auditSvc := newTestAuditService()
 
 	_, err := store.Save(context.Background(), "user1", "alive123", "https://practicum.yandex.ru/")
 	assert.NoError(t, err)
+
 	_, err = store.Save(context.Background(), "user1", "dead123", "https://example.com/")
 	assert.NoError(t, err)
+
 	err = store.MarkDeleted("user1", []string{"dead123"})
 	assert.NoError(t, err)
 
@@ -98,17 +100,44 @@ func TestGetIDURL(t *testing.T) {
 		wantStatusCode int
 		wantLocation   string
 	}{
-		{"valid GET redirects", http.MethodGet, "/alive123", http.StatusTemporaryRedirect, "https://practicum.yandex.ru/"},
-		{"deleted URL returns 410", http.MethodGet, "/dead123", http.StatusGone, ""},
-		{"unknown method", http.MethodPost, "/alive123", http.StatusNotFound, ""},
-		{"empty path", http.MethodGet, "/", http.StatusNotFound, ""},
-		{"non-existent id", http.MethodGet, "/unknown", http.StatusNotFound, ""},
+		{
+			name:           "valid GET redirects",
+			method:         http.MethodGet,
+			path:           "/alive123",
+			wantStatusCode: http.StatusTemporaryRedirect,
+			wantLocation:   "https://practicum.yandex.ru/",
+		},
+		{
+			name:           "deleted URL returns 410",
+			method:         http.MethodGet,
+			path:           "/dead123",
+			wantStatusCode: http.StatusGone,
+		},
+		{
+			name:           "unknown method",
+			method:         http.MethodPost,
+			path:           "/alive123",
+			wantStatusCode: http.StatusNotFound,
+		},
+		{
+			name:           "empty path",
+			method:         http.MethodGet,
+			path:           "/",
+			wantStatusCode: http.StatusNotFound,
+		},
+		{
+			name:           "non-existent id",
+			method:         http.MethodGet,
+			path:           "/unknown",
+			wantStatusCode: http.StatusNotFound,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(tt.method, tt.path, nil)
 			w := httptest.NewRecorder()
+
 			router.ServeHTTP(w, req)
 
 			assert.Equal(t, tt.wantStatusCode, w.Code)
