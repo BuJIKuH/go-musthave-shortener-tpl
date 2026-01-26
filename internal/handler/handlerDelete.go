@@ -8,6 +8,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// DeleteUserURLs возвращает Gin handler для асинхронного удаления URL пользователя.
+//
+// Этот хендлер:
+//  1. Извлекает userID из контекста (устанавливается AuthMiddleware).
+//  2. Парсит JSON-массив идентификаторов URL для удаления.
+//  3. Отправляет задачу на удаление в сервис Deleter.
+//  4. Возвращает статус 202 Accepted.
+//
+// Ответы:
+//   - 202 Accepted — задача принята в обработку.
+//   - 400 Bad Request — неверный формат JSON.
+//   - 401 Unauthorized — userID отсутствует в контексте.
 func DeleteUserURLs(s storage.Storage, d *service.Deleter) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		v, ok := c.Get("userID")

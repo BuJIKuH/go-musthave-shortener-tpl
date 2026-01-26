@@ -11,6 +11,9 @@ import (
 
 const userIDKey = "userID"
 
+// generateToken создаёт новый userID и соответствующий JWT-токен.
+// Возвращает сгенерированный userID и токен, либо ошибку.
+// Logger используется для логирования ошибок генерации токена.
 func generateToken(am *auth.Manager, logger *zap.Logger) (newID, newToken string, err error) {
 	newID = uuid.NewString()
 	token, err := am.GenerateToken(newID)
@@ -21,6 +24,22 @@ func generateToken(am *auth.Manager, logger *zap.Logger) (newID, newToken string
 	return newID, token, nil
 }
 
+// AuthMiddleware возвращает Gin middleware для авторизации пользователей через cookie "auth_token".
+//
+// Поведение:
+// 1. Если cookie отсутствует или пустая, создаётся новый userID и токен, cookie устанавливается клиенту.
+// 2. Если cookie есть, middleware проверяет токен через auth.Manager.
+//   - Если токен валиден, userID сохраняется в контекст Gin.
+//   - Если токен невалиден, создаётся новый userID и токен, cookie обновляется.
+//
+// 3. userID сохраняется в контекст запроса под ключом "userID".
+// 4. Ошибки генерации токена логируются через zap.Logger.
+// 5. После проверки токена вызывается c.Next() для передачи управления следующему обработчику.
+//
+// Пример использования:
+//
+//	r := gin.New()
+//	r.Use(AuthMiddleware(authManager, logger))
 func AuthMiddleware(am *auth.Manager, logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 

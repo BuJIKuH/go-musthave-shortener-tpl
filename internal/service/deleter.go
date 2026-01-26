@@ -6,23 +6,29 @@ import (
 	"time"
 )
 
+// DeleteTask описывает задачу удаления коротких URL для конкретного пользователя.
 type DeleteTask struct {
 	UserID string
 	IDs    []string
 }
 
+// Deleter реализует асинхронное пакетное удаление URL.
+// Использует несколько рабочих потоков (goroutine) и буферизацию задач для эффективной работы.
 type Deleter struct {
-	markFunc     func(userID string, shorts []string) error
-	queues       []chan DeleteTask
-	fanIn        chan DeleteTask
-	maxBatchSize int
-	batchTimeout time.Duration
+	markFunc     func(userID string, shorts []string) error // функция пометки URL как удалённых
+	queues       []chan DeleteTask                          // каналы рабочих потоков
+	fanIn        chan DeleteTask                            // единый канал для батчевой обработки
+	maxBatchSize int                                        // максимальный размер пакета для обработки
+	batchTimeout time.Duration                              // таймаут между пакетами
 
-	done    chan struct{}
+	done    chan struct{} // сигнал завершения
 	wg      sync.WaitGroup
 	counter uint32
 }
 
+// NewDeleter создаёт новый сервис Deleter.
+// markFunc — функция для пометки URL как удалённых в хранилище.
+// Возвращает инициализированный Deleter с запущенными воркерами для пакетного удаления.
 func NewDeleter(markFunc func(userID string, shorts []string) error) *Deleter {
 	const workers = 3
 
@@ -67,6 +73,7 @@ func NewDeleter(markFunc func(userID string, shorts []string) error) *Deleter {
 	return d
 }
 
+// Enqueue добавляет задачу удаления DeleteTask в очередь Deleter для асинхронной обработки.
 func (d *Deleter) Enqueue(t DeleteTask) {
 	if len(d.queues) == 0 {
 		return
@@ -81,6 +88,9 @@ func (d *Deleter) Enqueue(t DeleteTask) {
 	}
 }
 
+// batchWorker запускает обработчик пакетного удаления.
+// Объединяет задачи по пользователю и вызывает markFunc для каждой группы.
+// Пакеты отправляются при достижении maxBatchSize или по таймауту batchTimeout.
 func (d *Deleter) batchWorker() {
 	defer d.wg.Done()
 
@@ -127,6 +137,7 @@ func (d *Deleter) batchWorker() {
 	}
 }
 
+// Close останавливает все воркеры и завершает обработку всех оставшихся задач.
 func (d *Deleter) Close() {
 	close(d.done)
 

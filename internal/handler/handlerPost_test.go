@@ -2,19 +2,22 @@ package handler_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/audit"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/handler"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 )
 
+// middleware для тестов — задаёт userID
 func testUser() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Set("userID", "test-user")
@@ -22,10 +25,26 @@ func testUser() gin.HandlerFunc {
 	}
 }
 
+// noop observer для audit
+type noopObserver struct{}
+
+func (n *noopObserver) Notify(_ context.Context, _ audit.Event) error {
+	return nil
+}
+
+func newTestAuditService() *audit.Service {
+	log := zap.NewNop()
+	return audit.NewService(log, &noopObserver{})
+}
+
+// --- TEST POST /api/shorten/batch ---
 func TestPostBatchURL(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	baseURL := "http://localhost:8080"
-	router := gin.Default()
+	router := gin.New()
 	router.Use(testUser())
+
 	store := storage.NewInMemoryStorage()
 	router.POST("/api/shorten/batch", handler.PostBatchURL(store, baseURL))
 
@@ -36,10 +55,8 @@ func TestPostBatchURL(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		resp := w.Result()
-		defer resp.Body.Close()
 
-		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
 	t.Run("invalid JSON", func(t *testing.T) {
@@ -48,10 +65,8 @@ func TestPostBatchURL(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		resp := w.Result()
-		defer resp.Body.Close()
 
-		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
 	t.Run("valid batch", func(t *testing.T) {
@@ -66,40 +81,39 @@ func TestPostBatchURL(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		resp := w.Result()
-		defer resp.Body.Close()
 
-		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+		assert.Equal(t, http.StatusCreated, w.Code)
 
 		var result []handler.BatchResponseItem
-		data, _ := io.ReadAll(resp.Body)
-		_ = json.Unmarshal(data, &result)
-
+		err := json.Unmarshal(w.Body.Bytes(), &result)
+		assert.NoError(t, err)
 		assert.Len(t, result, 2)
 		assert.True(t, strings.HasPrefix(result[0].ShortURL, baseURL))
 	})
 }
 
+// --- TEST POST / ---
 func TestPostRawURL(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	baseURL := "http://localhost:8080"
-	router := gin.Default()
+	router := gin.New()
 	router.Use(testUser())
+
 	store := storage.NewInMemoryStorage()
-	router.POST("/", handler.PostRawURL(store, baseURL))
+	auditSvc := newTestAuditService()
+
+	router.POST("/", handler.PostRawURL(store, baseURL, auditSvc))
 
 	t.Run("valid POST", func(t *testing.T) {
-		url := "https://example.com"
-		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(url))
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://example.com"))
 		req.Header.Set("Content-Type", "text/plain")
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		resp := w.Result()
-		defer resp.Body.Close()
 
-		body, _ := io.ReadAll(resp.Body)
-		assert.Equal(t, http.StatusCreated, resp.StatusCode)
-		assert.True(t, strings.HasPrefix(string(body), baseURL))
+		assert.Equal(t, http.StatusCreated, w.Code)
+		assert.True(t, strings.HasPrefix(w.Body.String(), baseURL))
 	})
 
 	t.Run("empty body", func(t *testing.T) {
@@ -108,10 +122,8 @@ func TestPostRawURL(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		resp := w.Result()
-		defer resp.Body.Close()
 
-		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
 	t.Run("invalid content type", func(t *testing.T) {
@@ -120,19 +132,23 @@ func TestPostRawURL(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		resp := w.Result()
-		defer resp.Body.Close()
 
-		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 }
 
+// --- TEST POST /api/shorten ---
 func TestPostJSONURL(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	baseURL := "http://localhost:8080"
-	router := gin.Default()
+	router := gin.New()
 	router.Use(testUser())
+
 	store := storage.NewInMemoryStorage()
-	router.POST("/api/shorten", handler.PostJSONURL(store, baseURL))
+	auditSvc := newTestAuditService()
+
+	router.POST("/api/shorten", handler.PostJSONURL(store, baseURL, auditSvc))
 
 	t.Run("valid JSON", func(t *testing.T) {
 		body, _ := json.Marshal(map[string]string{"url": "https://example.com"})
@@ -141,12 +157,9 @@ func TestPostJSONURL(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		resp := w.Result()
-		defer resp.Body.Close()
 
-		data, _ := io.ReadAll(resp.Body)
-		assert.Equal(t, http.StatusCreated, resp.StatusCode)
-		assert.Contains(t, string(data), baseURL)
+		assert.Equal(t, http.StatusCreated, w.Code)
+		assert.Contains(t, w.Body.String(), baseURL)
 	})
 
 	t.Run("invalid JSON", func(t *testing.T) {
@@ -155,10 +168,8 @@ func TestPostJSONURL(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		resp := w.Result()
-		defer resp.Body.Close()
 
-		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
 	t.Run("empty URL", func(t *testing.T) {
@@ -168,9 +179,7 @@ func TestPostJSONURL(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		resp := w.Result()
-		defer resp.Body.Close()
 
-		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 }

@@ -11,13 +11,23 @@ import (
 	"go.uber.org/zap"
 )
 
+// DBStorage реализует хранение URL в PostgreSQL.
 type DBStorage struct {
 	DB     *sql.DB
 	Logger *zap.Logger
 }
 
+// ErrURLExists возвращается, если сохраняемый URL уже существует.
 var ErrURLExists = fmt.Errorf("url already exists")
 
+// NewDBStorage создаёт новое подключение к базе данных PostgreSQL.
+// Параметры:
+//   - dsn: Data Source Name для подключения к БД.
+//   - logger: zap.Logger для логирования операций.
+//
+// Возвращает:
+//   - *DBStorage: готовый объект для работы с хранилищем.
+//   - error: ошибка при открытии или пинге БД.
 func NewDBStorage(dsn string, logger *zap.Logger) (*DBStorage, error) {
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
@@ -36,6 +46,16 @@ func NewDBStorage(dsn string, logger *zap.Logger) (*DBStorage, error) {
 	}, nil
 }
 
+// SaveBatch сохраняет несколько URL в хранилище одним батчем.
+// Параметры:
+//   - ctx: context для контроля таймаута и отмены.
+//   - userID: идентификатор пользователя.
+//   - batch: список элементов BatchItem для сохранения.
+//
+// Возвращает:
+//   - map[string]string: новые URL и их короткие идентификаторы.
+//   - map[string]string: URL, которые уже существовали (conflict).
+//   - error: ошибка выполнения операции.
 func (s *DBStorage) SaveBatch(ctx context.Context, userID string, batch []BatchItem) (map[string]string, map[string]string, error) {
 	newMap := make(map[string]string)
 	conflictMap := make(map[string]string)
@@ -93,6 +113,16 @@ func (s *DBStorage) SaveBatch(ctx context.Context, userID string, batch []BatchI
 	return newMap, conflictMap, nil
 }
 
+// Save сохраняет один URL в хранилище.
+// Параметры:
+//   - ctx: context запроса.
+//   - userID: идентификатор пользователя.
+//   - id: короткий идентификатор URL.
+//   - url: оригинальный URL.
+//
+// Возвращает:
+//   - string: короткий идентификатор, который был сохранён или уже существовал.
+//   - error: ErrURLExists если URL уже существует, или другую ошибку.
 func (s *DBStorage) Save(ctx context.Context, userID, id, url string) (string, error) {
 	query := `
         INSERT INTO urls (short_url, original_url, user_id)
@@ -121,6 +151,13 @@ func (s *DBStorage) Save(ctx context.Context, userID, id, url string) (string, e
 	}
 }
 
+// Get возвращает запись URL по короткому идентификатору.
+// Параметры:
+//   - id: короткий идентификатор URL.
+//
+// Возвращает:
+//   - *URLRecord: запись URL с полями ShortID, OriginalURL, UserID, Deleted.
+//   - bool: true если запись найдена, false если не найдена.
 func (s *DBStorage) Get(id string) (*URLRecord, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -149,6 +186,14 @@ func (s *DBStorage) Close() error {
 	return s.DB.Close()
 }
 
+// GetUserURLs возвращает список URL для указанного пользователя.
+// Параметры:
+//   - ctx: context запроса.
+//   - userID: идентификатор пользователя.
+//
+// Возвращает:
+//   - []BatchItem: список коротких и оригинальных URL.
+//   - error: ошибка запроса к базе.
 func (s *DBStorage) GetUserURLs(ctx context.Context, userID string) ([]BatchItem, error) {
 	rows, err := s.DB.QueryContext(ctx,
 		`SELECT short_url, original_url FROM urls WHERE user_id = $1`,
@@ -174,6 +219,13 @@ func (s *DBStorage) GetUserURLs(ctx context.Context, userID string) ([]BatchItem
 	return result, nil
 }
 
+// MarkDeleted помечает список URL как удалённые для указанного пользователя.
+// Параметры:
+//   - userID: идентификатор пользователя.
+//   - shorts: список коротких идентификаторов для удаления.
+//
+// Возвращает:
+//   - error: ошибка обновления записей в базе.
 func (s *DBStorage) MarkDeleted(userID string, shorts []string) error {
 	if len(shorts) == 0 {
 		return nil

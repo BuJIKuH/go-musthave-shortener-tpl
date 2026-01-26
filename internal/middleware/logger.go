@@ -7,6 +7,22 @@ import (
 	"go.uber.org/zap"
 )
 
+// Logger возвращает Gin middleware для логирования HTTP-запросов.
+//
+// Middleware записывает информацию о каждом запросе после его обработки:
+// - HTTP метод (GET, POST и т.д.)
+// - Путь запроса
+// - HTTP статус ответа
+// - Размер ответа в байтах
+// - Задержку обработки запроса
+// - IP клиента
+//
+// Logger используется для логирования через zap.Logger.
+//
+// Пример использования:
+//
+//	r := gin.New()
+//	r.Use(Logger(logger))
 func Logger(logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
