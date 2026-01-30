@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// --- TEST GET /api/user/urls ---
 func TestGetUserURLs(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -20,8 +21,8 @@ func TestGetUserURLs(t *testing.T) {
 
 	// pre-fill data for a user
 	userID := "user123"
-	store.Save(context.Background(), userID, "abc123", "https://ya.ru")
-	store.Save(context.Background(), userID, "xyz789", "https://google.com")
+	_, _ = store.Save(context.Background(), userID, "abc123", "https://ya.ru")
+	_, _ = store.Save(context.Background(), userID, "xyz789", "https://google.com")
 
 	router := gin.New()
 	router.GET("/api/user/urls", func(c *gin.Context) {
@@ -43,7 +44,6 @@ func TestGetUserURLs(t *testing.T) {
 
 		var actual []map[string]string
 		assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &actual))
-
 		assert.ElementsMatch(t, expected, actual)
 	})
 
@@ -74,10 +74,12 @@ func TestGetUserURLs(t *testing.T) {
 	})
 }
 
+// --- TEST GET /:id ---
 func TestGetIDURL(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	store := storage.NewInMemoryStorage()
+	auditSvc := newTestAuditService()
 
 	_, err := store.Save(context.Background(), "user1", "alive123", "https://practicum.yandex.ru/")
 	assert.NoError(t, err)
@@ -89,7 +91,7 @@ func TestGetIDURL(t *testing.T) {
 	assert.NoError(t, err)
 
 	router := gin.New()
-	router.GET("/:id", handler.GetIDURL(store))
+	router.GET("/:id", handler.GetIDURL(store, auditSvc))
 
 	tests := []struct {
 		name           string
@@ -138,7 +140,7 @@ func TestGetIDURL(t *testing.T) {
 
 			router.ServeHTTP(w, req)
 
-			assert.Equal(t, tt.wantStatusCode, w.Code, "unexpected status code")
+			assert.Equal(t, tt.wantStatusCode, w.Code)
 			if tt.wantLocation != "" {
 				assert.Equal(t, tt.wantLocation, w.Header().Get("Location"))
 			}

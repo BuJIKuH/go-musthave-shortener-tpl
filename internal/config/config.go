@@ -8,18 +8,33 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// Config holds the configuration settings for the URL shortener service.
+// Fields include server address, base URL, storage paths, and auth secret.
 type Config struct {
 	Address         string `env:"SERVER_ADDRESS"`
 	ShortenAddress  string `env:"BASE_URL"`
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	DatabaseDSN     string `env:"DATABASE_DSN"`
 	AuthSecret      string `env:"AUTH_SECRET"`
+	AuditFile       string `env:"AUDIT_FILE"`
+	AuditURL        string `env:"AUDIT_URL"`
 }
 
+// String returns a string representation of the config for logging or debugging.
 func (f *Config) String() string {
-	return fmt.Sprintf("--a %s --b %s --f %s --d %s", f.Address, f.ShortenAddress, f.FileStoragePath, f.DatabaseDSN)
+	return fmt.Sprintf(
+		"--a %s --b %s --f %s --d %s --af %s --au %s",
+		f.Address,
+		f.ShortenAddress,
+		f.FileStoragePath,
+		f.DatabaseDSN,
+		f.AuditFile,
+		f.AuditURL,
+	)
 }
 
+// InitConfig initializes and returns the service configuration.
+// It parses flags and environment variables, falling back to defaults.
 func InitConfig() *Config {
 	var cfg Config
 	if err := godotenv.Load(); err != nil {
@@ -34,6 +49,8 @@ func InitConfig() *Config {
 	flag.StringVar(&cfg.ShortenAddress, "b", "", "Base URL for shortened links")
 	flag.StringVar(&cfg.FileStoragePath, "f", "", "File storage path")
 	flag.StringVar(&cfg.DatabaseDSN, "d", "", "Database DNS")
+	flag.StringVar(&cfg.AuditFile, "audit-file", "", "audit log file path")
+	flag.StringVar(&cfg.AuditURL, "audit-url", "", "audit http endpoint")
 	flag.Parse()
 
 	envAddress := os.Getenv("SERVER_ADDRESS")
@@ -41,6 +58,16 @@ func InitConfig() *Config {
 	envStoragePath := os.Getenv("FILE_STORAGE_PATH")
 	envDatabaseDNS := os.Getenv("DATABASE_DNS")
 	envAuthSecret := os.Getenv("AUTH_SECRET")
+	envAuditFile := os.Getenv("AUDIT_FILE")
+	envAuditURL := os.Getenv("AUDIT_URL")
+
+	if envAuditFile != "" {
+		cfg.AuditFile = envAuditFile
+	}
+
+	if envAuditURL != "" {
+		cfg.AuditURL = envAuditURL
+	}
 
 	if envAuthSecret != "" {
 		cfg.AuthSecret = envAuthSecret
