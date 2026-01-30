@@ -16,8 +16,8 @@ type Config struct {
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	DatabaseDSN     string `env:"DATABASE_DSN"`
 	AuthSecret      string `env:"AUTH_SECRET"`
-	AuditFile       string `json:"AUDIT_FILE"`
-	AuditURL        string `json:"AUDIT_URL"`
+	AuditFile       string `env:"AUDIT_FILE"`
+	AuditURL        string `env:"AUDIT_URL"`
 }
 
 // String returns a string representation of the config for logging or debugging.
