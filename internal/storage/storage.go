@@ -1,3 +1,4 @@
+// Package storage содержит реализацию хранилищ URL.
 package storage
 
 import (
@@ -5,6 +6,7 @@ import (
 	"sync"
 )
 
+// InMemoryStorage — потокобезопасное хранилище URL в памяти.
 type InMemoryStorage struct {
 	mu              sync.RWMutex
 	data            map[string]URLRecord
@@ -12,6 +14,7 @@ type InMemoryStorage struct {
 	userURLs        map[string][]BatchItem
 }
 
+// NewInMemoryStorage создает новое in-memory хранилище.
 func NewInMemoryStorage() *InMemoryStorage {
 	return &InMemoryStorage{
 		data:            make(map[string]URLRecord),
@@ -20,10 +23,12 @@ func NewInMemoryStorage() *InMemoryStorage {
 	}
 }
 
+// Ping проверяет доступность хранилища (в памяти всегда OK).
 func (s *InMemoryStorage) Ping(ctx context.Context) error {
 	return nil
 }
 
+// SaveBatch сохраняет несколько URL за один вызов.
 func (s *InMemoryStorage) SaveBatch(ctx context.Context, userID string, batch []BatchItem) (map[string]string, map[string]string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -54,6 +59,7 @@ func (s *InMemoryStorage) SaveBatch(ctx context.Context, userID string, batch []
 	return newMap, conflictMap, nil
 }
 
+// Save сохраняет один URL.
 func (s *InMemoryStorage) Save(ctx context.Context, userID, id, url string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -76,9 +82,11 @@ func (s *InMemoryStorage) Save(ctx context.Context, userID, id, url string) (str
 	return id, nil
 }
 
+// Get возвращает запись URL по короткому идентификатору.
 func (s *InMemoryStorage) Get(id string) (*URLRecord, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
 	rec, ok := s.data[id]
 	if !ok {
 		return nil, false
@@ -87,27 +95,26 @@ func (s *InMemoryStorage) Get(id string) (*URLRecord, bool) {
 	return &c, true
 }
 
+// GetUserURLs возвращает список URL пользователя.
 func (s *InMemoryStorage) GetUserURLs(ctx context.Context, userID string) ([]BatchItem, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	list, ok := s.userURLs[userID]
-	if !ok || len(list) == 0 {
+	if !ok {
 		return nil, nil
 	}
 	return list, nil
 }
 
+// MarkDeleted помечает список URL как удалённые для указанного пользователя.
 func (s *InMemoryStorage) MarkDeleted(userID string, shorts []string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	for _, short := range shorts {
 		rec, ok := s.data[short]
-		if !ok {
-			continue
-		}
-		if rec.UserID != userID {
+		if !ok || rec.UserID != userID {
 			continue
 		}
 		rec.Deleted = true
