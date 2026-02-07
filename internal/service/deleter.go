@@ -1,3 +1,4 @@
+// Package service предоставляет сервисы для работы с URL, включая асинхронное удаление.
 package service
 
 import (

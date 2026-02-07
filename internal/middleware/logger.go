@@ -1,3 +1,9 @@
+// Package middleware содержит Gin middleware для логирования, gzip-сжатия и авторизации.
+//
+// Logger — middleware для логирования HTTP-запросов с использованием zap.Logger.
+// GzipMiddleware — middleware для сжатия ответа.
+// AuthMiddleware — middleware для авторизации.
+
 package middleware
 
 import (
