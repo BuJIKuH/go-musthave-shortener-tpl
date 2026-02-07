@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/audit"
@@ -21,7 +22,24 @@ import (
 	_ "net/http/pprof"
 )
 
+// buildVersion хранит версию сборки.
+// Значение подставляется во время сборки через -ldflags.
+// Если не указано, будет пустая строка.
+var buildVersion string
+
+// buildDate хранит дату сборки.
+// Значение подставляется во время сборки через -ldflags.
+var buildDate string
+
+// buildCommit хранит хэш коммита сборки.
+// Значение подставляется во время сборки через -ldflags.
+var buildCommit string
+
 func main() {
+	fmt.Printf("Build version: %s\n", defaultIfEmpty(buildVersion))
+	fmt.Printf("Build date: %s\n", defaultIfEmpty(buildDate))
+	fmt.Printf("Build commit: %s\n", defaultIfEmpty(buildCommit))
+
 	fx.New(
 		fx.Provide(
 			config.InitConfig,
@@ -165,4 +183,12 @@ func startServer(lc fx.Lifecycle, cfg *config.Config, r *gin.Engine, logger *zap
 			return srv.Shutdown(ctx)
 		},
 	})
+}
+
+// defaultIfEmpty возвращает "N/A", если строка пустая
+func defaultIfEmpty(s string) string {
+	if s == "" {
+		return "N/A"
+	}
+	return s
 }
