@@ -1,3 +1,4 @@
+// Package storage содержит функции для работы с базой данных и миграциями.
 package storage
 
 import (
@@ -11,13 +12,20 @@ import (
 	"go.uber.org/zap"
 )
 
+// RunMigrations выполняет миграции базы данных PostgreSQL.
+// dns — строка подключения к базе данных.
+// logger — zap.Logger для логирования ошибок и информации.
 func RunMigrations(dns string, logger *zap.Logger) error {
 	db, err := sql.Open("postgres", dns)
 	if err != nil {
 		logger.Error("cannot open DB", zap.Error(err))
 		return err
 	}
-	defer db.Close()
+	defer func() {
+		if cerr := db.Close(); cerr != nil {
+			logger.Error("failed to close DB connection", zap.Error(cerr))
+		}
+	}()
 
 	path, err := filepath.Abs("internal/storage/migrations")
 	if err != nil {
@@ -33,11 +41,12 @@ func RunMigrations(dns string, logger *zap.Logger) error {
 		logger.Error("cannot create migration", zap.Error(err))
 		return err
 	}
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		logger.Info("cannot run migration", zap.Error(err))
-		return err
-	}
-	logger.Info("migrations successfully migrated")
 
+	if upErr := m.Up(); upErr != nil && upErr != migrate.ErrNoChange {
+		logger.Error("cannot run migration", zap.Error(upErr))
+		return upErr
+	}
+
+	logger.Info("migrations successfully migrated")
 	return nil
 }

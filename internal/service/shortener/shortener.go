@@ -1,3 +1,4 @@
+// Package shortener предоставляет функции для генерации коротких идентификаторов URL.
 package shortener
 
 import (

@@ -1,3 +1,4 @@
+// Package storage реализует хранение URL в PostgreSQL.
 package storage
 
 import (

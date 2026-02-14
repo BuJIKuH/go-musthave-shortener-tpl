@@ -1,3 +1,6 @@
+// Package middleware содержит middleware для Gin, включая авторизацию через cookie.
+//
+// AuthMiddleware — middleware для проверки и генерации токена пользователя (JWT) через cookie "auth_token".
 package middleware
 
 import (
