@@ -3,6 +3,7 @@
 package config
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -24,6 +25,14 @@ type Config struct {
 	EnableHTTPS bool `env:"ENABLE_HTTPS"`
 }
 
+type jsonConfig struct {
+	ServerAddress   string `json:"server_address"`
+	BaseURL         string `json:"base_url"`
+	FileStoragePath string `json:"file_storage_path"`
+	DatabaseDSN     string `json:"database_dsn"`
+	EnableHTTPS     bool   `json:"enable_https"`
+}
+
 // String returns a string representation of the config for logging or debugging.
 func (f *Config) String() string {
 	return fmt.Sprintf(
@@ -42,15 +51,18 @@ func (f *Config) String() string {
 // It parses flags and environment variables, falling back to defaults.
 func InitConfig() *Config {
 	var cfg Config
-	if err := godotenv.Load(); err != nil {
-		fmt.Println("⚠️ .env not loaded:", err)
-	}
+
+	_ = godotenv.Load()
 
 	defaultAddr := "localhost:8080"
 	defaultBase := "http://localhost:8080"
 	defaultStoragePath := "./storageJson.json"
 
-	var secure bool
+	var (
+		secure     bool
+		configPath string
+	)
+
 	flag.StringVar(&cfg.Address, "a", "", "Address to listen on")
 	flag.StringVar(&cfg.ShortenAddress, "b", "", "Base URL for shortened links")
 	flag.StringVar(&cfg.FileStoragePath, "f", "", "File storage path")
@@ -58,53 +70,90 @@ func InitConfig() *Config {
 	flag.StringVar(&cfg.AuditFile, "audit-file", "", "audit log file path")
 	flag.StringVar(&cfg.AuditURL, "audit-url", "", "audit http endpoint")
 	flag.BoolVar(&secure, "s", false, "enable https")
+
+	flag.StringVar(&configPath, "c", "", "config file path")
+	flag.StringVar(&configPath, "config", "", "config file path")
+
 	flag.Parse()
 
-	envAddress := os.Getenv("SERVER_ADDRESS")
-	envBaseURL := os.Getenv("BASE_URL")
-	envStoragePath := os.Getenv("FILE_STORAGE_PATH")
-	envDatabaseDNS := os.Getenv("DATABASE_DNS")
-	envAuthSecret := os.Getenv("AUTH_SECRET")
-	envAuditFile := os.Getenv("AUDIT_FILE")
-	envAuditURL := os.Getenv("AUDIT_URL")
-
-	envEnableHTTPS := os.Getenv("ENABLE_HTTPS") == "true"
-
-	cfg.EnableHTTPS = secure || envEnableHTTPS
-
-	if envAuditFile != "" {
-		cfg.AuditFile = envAuditFile
+	// --- JSON CONFIG (самый низкий приоритет) ---
+	if configPath == "" {
+		configPath = os.Getenv("CONFIG")
 	}
 
-	if envAuditURL != "" {
-		cfg.AuditURL = envAuditURL
+	if configPath != "" {
+		if jc, err := loadJSONConfig(configPath); err == nil {
+			if jc.ServerAddress != "" {
+				cfg.Address = jc.ServerAddress
+			}
+			if jc.BaseURL != "" {
+				cfg.ShortenAddress = jc.BaseURL
+			}
+			if jc.FileStoragePath != "" {
+				cfg.FileStoragePath = jc.FileStoragePath
+			}
+			if jc.DatabaseDSN != "" {
+				cfg.DatabaseDSN = jc.DatabaseDSN
+			}
+			cfg.EnableHTTPS = jc.EnableHTTPS
+		}
 	}
 
-	if envAuthSecret != "" {
-		cfg.AuthSecret = envAuthSecret
+	// --- ENV ---
+	if v := os.Getenv("SERVER_ADDRESS"); v != "" {
+		cfg.Address = v
+	}
+	if v := os.Getenv("BASE_URL"); v != "" {
+		cfg.ShortenAddress = v
+	}
+	if v := os.Getenv("FILE_STORAGE_PATH"); v != "" {
+		cfg.FileStoragePath = v
+	}
+	if v := os.Getenv("DATABASE_DNS"); v != "" {
+		cfg.DatabaseDSN = v
+	}
+	if v := os.Getenv("AUTH_SECRET"); v != "" {
+		cfg.AuthSecret = v
+	}
+	if v := os.Getenv("AUDIT_FILE"); v != "" {
+		cfg.AuditFile = v
+	}
+	if v := os.Getenv("AUDIT_URL"); v != "" {
+		cfg.AuditURL = v
+	}
+	if os.Getenv("ENABLE_HTTPS") == "true" {
+		cfg.EnableHTTPS = true
 	}
 
-	if envAddress != "" {
-		cfg.Address = envAddress
-	} else if cfg.Address == "" {
+	// --- FLAGS (самый высокий приоритет) ---
+	if secure {
+		cfg.EnableHTTPS = true
+	}
+
+	// --- DEFAULTS ---
+	if cfg.Address == "" {
 		cfg.Address = defaultAddr
 	}
-
-	if envBaseURL != "" {
-		cfg.ShortenAddress = envBaseURL
-	} else if cfg.ShortenAddress == "" {
+	if cfg.ShortenAddress == "" {
 		cfg.ShortenAddress = defaultBase
 	}
-
-	if envStoragePath != "" {
-		cfg.FileStoragePath = envStoragePath
-	} else if cfg.FileStoragePath == "" {
+	if cfg.FileStoragePath == "" {
 		cfg.FileStoragePath = defaultStoragePath
 	}
 
-	if envDatabaseDNS != "" {
-		cfg.DatabaseDSN = envDatabaseDNS
+	return &cfg
+}
+
+func loadJSONConfig(path string) (*jsonConfig, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
 	}
 
-	return &cfg
+	var cfg jsonConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil, err
+	}
+
+	return &cfg, nil
 }
