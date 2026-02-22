@@ -153,7 +153,12 @@ func newRouter(
 }
 
 // startServer запускает HTTP сервер и pprof сервер.
-func startServer(lc fx.Lifecycle, cfg *config.Config, r *gin.Engine, logger *zap.Logger) {
+func startServer(
+	lc fx.Lifecycle,
+	cfg *config.Config,
+	r *gin.Engine,
+	logger *zap.Logger,
+) {
 	srv := &http.Server{
 		Addr:    cfg.Address,
 		Handler: r,
@@ -161,9 +166,28 @@ func startServer(lc fx.Lifecycle, cfg *config.Config, r *gin.Engine, logger *zap
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			logger.Info("Starting HTTP server", zap.String("address", cfg.Address))
-
 			go func() {
+				if cfg.EnableHTTPS {
+					logger.Info(
+						"Starting HTTPS server",
+						zap.String("address", cfg.Address),
+					)
+
+					if err := srv.ListenAndServeTLS(
+						"cert.pem",
+						"key.pem",
+					); err != nil && err != http.ErrServerClosed {
+						logger.Error("HTTPS server error", zap.Error(err))
+					}
+
+					return
+				}
+
+				logger.Info(
+					"Starting HTTP server",
+					zap.String("address", cfg.Address),
+				)
+
 				if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 					logger.Error("HTTP server error", zap.Error(err))
 				}
@@ -179,7 +203,7 @@ func startServer(lc fx.Lifecycle, cfg *config.Config, r *gin.Engine, logger *zap
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			logger.Info("Stopping HTTP server")
+			logger.Info("Stopping server")
 			return srv.Shutdown(ctx)
 		},
 	})

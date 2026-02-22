@@ -20,18 +20,21 @@ type Config struct {
 	AuthSecret      string `env:"AUTH_SECRET"`
 	AuditFile       string `env:"AUDIT_FILE"`
 	AuditURL        string `env:"AUDIT_URL"`
+
+	EnableHTTPS bool `env:"ENABLE_HTTPS"`
 }
 
 // String returns a string representation of the config for logging or debugging.
 func (f *Config) String() string {
 	return fmt.Sprintf(
-		"--a %s --b %s --f %s --d %s --af %s --au %s",
+		"--a %s --b %s --f %s --d %s --af %s --au %s --s %t",
 		f.Address,
 		f.ShortenAddress,
 		f.FileStoragePath,
 		f.DatabaseDSN,
 		f.AuditFile,
 		f.AuditURL,
+		f.EnableHTTPS,
 	)
 }
 
@@ -47,12 +50,14 @@ func InitConfig() *Config {
 	defaultBase := "http://localhost:8080"
 	defaultStoragePath := "./storageJson.json"
 
+	var secure bool
 	flag.StringVar(&cfg.Address, "a", "", "Address to listen on")
 	flag.StringVar(&cfg.ShortenAddress, "b", "", "Base URL for shortened links")
 	flag.StringVar(&cfg.FileStoragePath, "f", "", "File storage path")
 	flag.StringVar(&cfg.DatabaseDSN, "d", "", "Database DNS")
 	flag.StringVar(&cfg.AuditFile, "audit-file", "", "audit log file path")
 	flag.StringVar(&cfg.AuditURL, "audit-url", "", "audit http endpoint")
+	flag.BoolVar(&secure, "s", false, "enable https")
 	flag.Parse()
 
 	envAddress := os.Getenv("SERVER_ADDRESS")
@@ -62,6 +67,10 @@ func InitConfig() *Config {
 	envAuthSecret := os.Getenv("AUTH_SECRET")
 	envAuditFile := os.Getenv("AUDIT_FILE")
 	envAuditURL := os.Getenv("AUDIT_URL")
+
+	envEnableHTTPS := os.Getenv("ENABLE_HTTPS") == "true"
+
+	cfg.EnableHTTPS = secure || envEnableHTTPS
 
 	if envAuditFile != "" {
 		cfg.AuditFile = envAuditFile
