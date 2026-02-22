@@ -6,6 +6,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/audit"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/auth"
@@ -40,7 +43,7 @@ func main() {
 	fmt.Printf("Build date: %s\n", defaultIfEmpty(buildDate))
 	fmt.Printf("Build commit: %s\n", defaultIfEmpty(buildCommit))
 
-	fx.New(
+	app := fx.New(
 		fx.Provide(
 			config.InitConfig,
 			newStorage,
@@ -51,7 +54,27 @@ func main() {
 			NewAuditService,
 		),
 		fx.Invoke(startServer),
-	).Run()
+	)
+
+	// Контекст для graceful shutdown при сигналах
+	ctx, stop := signal.NotifyContext(context.Background(),
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGQUIT,
+	)
+	defer stop()
+
+	go func() {
+		<-ctx.Done()
+		fmt.Println("⚡ Shutdown signal received")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := app.Stop(shutdownCtx); err != nil {
+			fmt.Println("❌ Error during shutdown:", err)
+		}
+	}()
+
+	app.Run()
 }
 
 // NewAuditService создает сервис аудита с указанными наблюдателями.
