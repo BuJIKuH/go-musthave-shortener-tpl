@@ -6,9 +6,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os/signal"
-	"syscall"
-	"time"
 
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/audit"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/auth"
@@ -55,24 +52,6 @@ func main() {
 		),
 		fx.Invoke(startServer),
 	)
-
-	// Контекст для graceful shutdown при сигналах
-	ctx, stop := signal.NotifyContext(context.Background(),
-		syscall.SIGINT,
-		syscall.SIGTERM,
-		syscall.SIGQUIT,
-	)
-	defer stop()
-
-	go func() {
-		<-ctx.Done()
-		fmt.Println("⚡ Shutdown signal received")
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if err := app.Stop(shutdownCtx); err != nil {
-			fmt.Println("❌ Error during shutdown:", err)
-		}
-	}()
 
 	app.Run()
 }
@@ -124,12 +103,12 @@ func NewLogger() (*zap.Logger, error) {
 
 // newStorage создает и возвращает хранилище для URL.
 func newStorage(cfg *config.Config, logger *zap.Logger) (storage.Storage, error) {
-	if cfg.DatabaseDSN != "" {
-		if err := storage.RunMigrations(cfg.DatabaseDSN, logger); err != nil {
+	if cfg.DatabaseDNS != "" {
+		if err := storage.RunMigrations(cfg.DatabaseDNS, logger); err != nil {
 			logger.Error("can't initialize database migrations", zap.Error(err))
 		}
 
-		dbStore, err := storage.NewDBStorage(cfg.DatabaseDSN, logger)
+		dbStore, err := storage.NewDBStorage(cfg.DatabaseDNS, logger)
 		if err == nil {
 			logger.Info("Using PostgreSQL storage")
 			return dbStore, nil

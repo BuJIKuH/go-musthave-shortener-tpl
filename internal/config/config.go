@@ -17,7 +17,7 @@ type Config struct {
 	Address         string `env:"SERVER_ADDRESS"`
 	ShortenAddress  string `env:"BASE_URL"`
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
-	DatabaseDSN     string `env:"DATABASE_DSN"`
+	DatabaseDNS     string `env:"DATABASE_DNS"`
 	AuthSecret      string `env:"AUTH_SECRET"`
 	AuditFile       string `env:"AUDIT_FILE"`
 	AuditURL        string `env:"AUDIT_URL"`
@@ -40,7 +40,7 @@ func (f *Config) String() string {
 		f.Address,
 		f.ShortenAddress,
 		f.FileStoragePath,
-		f.DatabaseDSN,
+		f.DatabaseDNS,
 		f.AuditFile,
 		f.AuditURL,
 		f.EnableHTTPS,
@@ -66,7 +66,7 @@ func InitConfig() *Config {
 	flag.StringVar(&cfg.Address, "a", "", "Address to listen on")
 	flag.StringVar(&cfg.ShortenAddress, "b", "", "Base URL for shortened links")
 	flag.StringVar(&cfg.FileStoragePath, "f", "", "File storage path")
-	flag.StringVar(&cfg.DatabaseDSN, "d", "", "Database DNS")
+	flag.StringVar(&cfg.DatabaseDNS, "d", "", "Database DNS")
 	flag.StringVar(&cfg.AuditFile, "audit-file", "", "audit log file path")
 	flag.StringVar(&cfg.AuditURL, "audit-url", "", "audit http endpoint")
 	flag.BoolVar(&secure, "s", false, "enable https")
@@ -93,7 +93,7 @@ func InitConfig() *Config {
 				cfg.FileStoragePath = jc.FileStoragePath
 			}
 			if jc.DatabaseDSN != "" {
-				cfg.DatabaseDSN = jc.DatabaseDSN
+				cfg.DatabaseDNS = jc.DatabaseDSN
 			}
 			cfg.EnableHTTPS = jc.EnableHTTPS
 		}
@@ -110,7 +110,7 @@ func InitConfig() *Config {
 		cfg.FileStoragePath = v
 	}
 	if v := os.Getenv("DATABASE_DNS"); v != "" {
-		cfg.DatabaseDSN = v
+		cfg.DatabaseDNS = v
 	}
 	if v := os.Getenv("AUTH_SECRET"); v != "" {
 		cfg.AuthSecret = v
