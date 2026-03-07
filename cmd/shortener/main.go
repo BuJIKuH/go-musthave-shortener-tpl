@@ -40,7 +40,7 @@ func main() {
 	fmt.Printf("Build date: %s\n", defaultIfEmpty(buildDate))
 	fmt.Printf("Build commit: %s\n", defaultIfEmpty(buildCommit))
 
-	fx.New(
+	app := fx.New(
 		fx.Provide(
 			config.InitConfig,
 			newStorage,
@@ -51,7 +51,9 @@ func main() {
 			NewAuditService,
 		),
 		fx.Invoke(startServer),
-	).Run()
+	)
+
+	app.Run()
 }
 
 // NewAuditService создает сервис аудита с указанными наблюдателями.
@@ -101,12 +103,12 @@ func NewLogger() (*zap.Logger, error) {
 
 // newStorage создает и возвращает хранилище для URL.
 func newStorage(cfg *config.Config, logger *zap.Logger) (storage.Storage, error) {
-	if cfg.DatabaseDSN != "" {
-		if err := storage.RunMigrations(cfg.DatabaseDSN, logger); err != nil {
+	if cfg.DatabaseDNS != "" {
+		if err := storage.RunMigrations(cfg.DatabaseDNS, logger); err != nil {
 			logger.Error("can't initialize database migrations", zap.Error(err))
 		}
 
-		dbStore, err := storage.NewDBStorage(cfg.DatabaseDSN, logger)
+		dbStore, err := storage.NewDBStorage(cfg.DatabaseDNS, logger)
 		if err == nil {
 			logger.Info("Using PostgreSQL storage")
 			return dbStore, nil
@@ -153,7 +155,12 @@ func newRouter(
 }
 
 // startServer запускает HTTP сервер и pprof сервер.
-func startServer(lc fx.Lifecycle, cfg *config.Config, r *gin.Engine, logger *zap.Logger) {
+func startServer(
+	lc fx.Lifecycle,
+	cfg *config.Config,
+	r *gin.Engine,
+	logger *zap.Logger,
+) {
 	srv := &http.Server{
 		Addr:    cfg.Address,
 		Handler: r,
@@ -161,9 +168,28 @@ func startServer(lc fx.Lifecycle, cfg *config.Config, r *gin.Engine, logger *zap
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			logger.Info("Starting HTTP server", zap.String("address", cfg.Address))
-
 			go func() {
+				if cfg.EnableHTTPS {
+					logger.Info(
+						"Starting HTTPS server",
+						zap.String("address", cfg.Address),
+					)
+
+					if err := srv.ListenAndServeTLS(
+						"cert.pem",
+						"key.pem",
+					); err != nil && err != http.ErrServerClosed {
+						logger.Error("HTTPS server error", zap.Error(err))
+					}
+
+					return
+				}
+
+				logger.Info(
+					"Starting HTTP server",
+					zap.String("address", cfg.Address),
+				)
+
 				if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 					logger.Error("HTTP server error", zap.Error(err))
 				}
@@ -179,7 +205,7 @@ func startServer(lc fx.Lifecycle, cfg *config.Config, r *gin.Engine, logger *zap
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			logger.Info("Stopping HTTP server")
+			logger.Info("Stopping server")
 			return srv.Shutdown(ctx)
 		},
 	})
