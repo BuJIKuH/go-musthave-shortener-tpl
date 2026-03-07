@@ -151,6 +151,8 @@ func newRouter(
 	r.GET("/api/user/urls", handler.GetUserURLs(store, cfg.ShortenAddress))
 	r.DELETE("/api/user/urls", handler.DeleteUserURLs(store, deleter))
 
+	r.GET("/api/internal/stats", handler.GetStats(store, cfg))
+
 	return r
 }
 

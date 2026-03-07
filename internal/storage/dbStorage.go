@@ -240,3 +240,43 @@ func (s *DBStorage) MarkDeleted(userID string, shorts []string) error {
 	_, err := s.DB.Exec(query, userID, pq.Array(shorts))
 	return err
 }
+
+// URLsCount возвращает общее количество сокращённых URL,
+// сохранённых в базе данных PostgreSQL.
+//
+// Выполняет SQL-запрос COUNT(*) к таблице urls.
+//
+// Возвращает:
+//   - int: количество записей URL в базе.
+//   - при ошибке возвращает 0 и логирует ошибку.
+func (s *DBStorage) URLsCount() int {
+	var count int
+
+	err := s.DB.QueryRow(`SELECT COUNT(*) FROM urls`).Scan(&count)
+	if err != nil {
+		s.Logger.Error("failed to count urls", zap.Error(err))
+		return 0
+	}
+
+	return count
+}
+
+// UsersCount возвращает количество уникальных пользователей,
+// имеющих хотя бы один сохранённый URL в базе данных.
+//
+// Выполняет SQL-запрос COUNT(DISTINCT user_id) к таблице urls.
+//
+// Возвращает:
+//   - int: количество уникальных пользователей.
+//   - при ошибке возвращает 0 и логирует ошибку.
+func (s *DBStorage) UsersCount() int {
+	var count int
+
+	err := s.DB.QueryRow(`SELECT COUNT(DISTINCT user_id) FROM urls`).Scan(&count)
+	if err != nil {
+		s.Logger.Error("failed to count users", zap.Error(err))
+		return 0
+	}
+
+	return count
+}

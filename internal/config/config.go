@@ -22,7 +22,8 @@ type Config struct {
 	AuditFile       string `env:"AUDIT_FILE"`
 	AuditURL        string `env:"AUDIT_URL"`
 
-	EnableHTTPS bool `env:"ENABLE_HTTPS"`
+	EnableHTTPS   bool   `env:"ENABLE_HTTPS"`
+	TrustedSubnet string `env:"TRUSTED_SUBNET"`
 }
 
 type jsonConfig struct {
@@ -31,12 +32,13 @@ type jsonConfig struct {
 	FileStoragePath string `json:"file_storage_path"`
 	DatabaseDSN     string `json:"database_dsn"`
 	EnableHTTPS     bool   `json:"enable_https"`
+	TrustedSubnet   string `json:"trusted_subnet"`
 }
 
 // String returns a string representation of the config for logging or debugging.
 func (f *Config) String() string {
 	return fmt.Sprintf(
-		"--a %s --b %s --f %s --d %s --af %s --au %s --s %t",
+		"--a %s --b %s --f %s --d %s --af %s --au %s --s %t -e %s",
 		f.Address,
 		f.ShortenAddress,
 		f.FileStoragePath,
@@ -44,6 +46,7 @@ func (f *Config) String() string {
 		f.AuditFile,
 		f.AuditURL,
 		f.EnableHTTPS,
+		f.TrustedSubnet,
 	)
 }
 
@@ -73,6 +76,7 @@ func InitConfig() *Config {
 
 	flag.StringVar(&configPath, "c", "", "config file path")
 	flag.StringVar(&configPath, "config", "", "config file path")
+	flag.StringVar(&cfg.TrustedSubnet, "t", "", "trusted subnet in CIDR")
 
 	flag.Parse()
 
@@ -96,6 +100,10 @@ func InitConfig() *Config {
 				cfg.DatabaseDNS = jc.DatabaseDSN
 			}
 			cfg.EnableHTTPS = jc.EnableHTTPS
+
+			if jc.TrustedSubnet != "" {
+				cfg.TrustedSubnet = jc.TrustedSubnet
+			}
 		}
 	}
 
@@ -123,6 +131,10 @@ func InitConfig() *Config {
 	}
 	if os.Getenv("ENABLE_HTTPS") == "true" {
 		cfg.EnableHTTPS = true
+	}
+
+	if v := os.Getenv("TRUSTED_SUBNET"); v != "" {
+		cfg.TrustedSubnet = v
 	}
 
 	// --- FLAGS (самый высокий приоритет) ---

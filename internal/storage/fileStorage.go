@@ -230,3 +230,32 @@ func (fs *FileStorage) Close() error {
 	defer fs.mu.Unlock()
 	return fs.file.Close()
 }
+
+// URLsCount возвращает общее количество сокращённых URL,
+// сохранённых в файловом хранилище.
+//
+// Метод использует RLock для потокобезопасного доступа
+// к внутреннему map-хранилищу данных.
+//
+// Возвращает:
+//   - int: количество записей URL.
+func (fs *FileStorage) URLsCount() int {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+
+	return len(fs.data)
+}
+
+// UsersCount возвращает количество пользователей,
+// имеющих сохранённые URL в файловом хранилище.
+//
+// Пользователи определяются по ключам map userURLs.
+//
+// Возвращает:
+//   - int: количество уникальных пользователей.
+func (fs *FileStorage) UsersCount() int {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+
+	return len(fs.userURLs)
+}
