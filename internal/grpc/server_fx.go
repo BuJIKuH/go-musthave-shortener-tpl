@@ -6,6 +6,7 @@ import (
 	"net"
 
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/auth"
+	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config"
 	shortenerpb "github.com/BuJIKuH/go-musthave-shortener-tpl/internal/proto/shortener"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/storage"
 
@@ -23,6 +24,7 @@ type Params struct {
 	Store     storage.Storage
 	Auth      *auth.Manager
 	Logger    *zap.Logger
+	Config    *config.Config
 }
 
 // RunGRPCServer регистрирует и запускает gRPC сервер.
@@ -34,16 +36,17 @@ func RunGRPCServer(p Params) {
 
 	grpcService := NewGRPCServer(
 		p.Store,
-		p.Auth,
 		p.Logger,
 	)
 
 	shortenerpb.RegisterShortenerServiceServer(server, grpcService)
 
-	// 🔹 включаем reflection, чтобы grpcurl и Insomnia могли видеть сервисы
+	// включаем reflection, чтобы grpcurl и Insomnia могли видеть сервисы
 	reflection.Register(server)
 
-	lis, err := net.Listen("tcp", ":50051")
+	addr := p.Config.GRPCAddress
+
+	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		p.Logger.Fatal("failed to listen gRPC", zap.Error(err))
 	}
@@ -51,7 +54,7 @@ func RunGRPCServer(p Params) {
 	p.Lifecycle.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			go func() {
-				p.Logger.Info("Starting gRPC server", zap.String("address", ":50051"))
+				p.Logger.Info("Starting gRPC server", zap.String("address", addr))
 				if err := server.Serve(lis); err != nil {
 					p.Logger.Error("gRPC server error", zap.Error(err))
 				}

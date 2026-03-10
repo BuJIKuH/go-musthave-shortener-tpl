@@ -32,9 +32,18 @@ type StatsResponse struct {
 //   - 200 OK — статистика успешно получена.
 //   - 403 Forbidden — доступ запрещён (IP не из доверенной подсети или subnet не задан).
 func GetStats(s storage.Storage, cfg *config.Config) gin.HandlerFunc {
+	var subnet *net.IPNet
+
+	if cfg.TrustedSubnet != "" {
+		_, sn, err := net.ParseCIDR(cfg.TrustedSubnet)
+		if err == nil {
+			subnet = sn
+		}
+	}
+
 	return func(c *gin.Context) {
 
-		if cfg.TrustedSubnet == "" {
+		if subnet == nil {
 			c.Status(http.StatusForbidden)
 			return
 		}
@@ -47,12 +56,6 @@ func GetStats(s storage.Storage, cfg *config.Config) gin.HandlerFunc {
 
 		ip := net.ParseIP(ipStr)
 		if ip == nil {
-			c.Status(http.StatusForbidden)
-			return
-		}
-
-		_, subnet, err := net.ParseCIDR(cfg.TrustedSubnet)
-		if err != nil {
 			c.Status(http.StatusForbidden)
 			return
 		}

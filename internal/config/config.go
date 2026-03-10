@@ -22,6 +22,8 @@ type Config struct {
 	AuditFile       string `env:"AUDIT_FILE"`
 	AuditURL        string `env:"AUDIT_URL"`
 
+	GRPCAddress string `env:"GRPC_ADDRESS"`
+
 	EnableHTTPS   bool   `env:"ENABLE_HTTPS"`
 	TrustedSubnet string `env:"TRUSTED_SUBNET"`
 }
@@ -33,12 +35,13 @@ type jsonConfig struct {
 	DatabaseDSN     string `json:"database_dsn"`
 	EnableHTTPS     bool   `json:"enable_https"`
 	TrustedSubnet   string `json:"trusted_subnet"`
+	GRPCAddress     string `json:"grpc_address"`
 }
 
 // String returns a string representation of the config for logging or debugging.
 func (f *Config) String() string {
 	return fmt.Sprintf(
-		"--a %s --b %s --f %s --d %s --af %s --au %s --s %t -e %s",
+		"--a %s --b %s --f %s --d %s --af %s --au %s --s %t --e %s --grpc %s",
 		f.Address,
 		f.ShortenAddress,
 		f.FileStoragePath,
@@ -47,6 +50,7 @@ func (f *Config) String() string {
 		f.AuditURL,
 		f.EnableHTTPS,
 		f.TrustedSubnet,
+		f.GRPCAddress,
 	)
 }
 
@@ -77,6 +81,7 @@ func InitConfig() *Config {
 	flag.StringVar(&configPath, "c", "", "config file path")
 	flag.StringVar(&configPath, "config", "", "config file path")
 	flag.StringVar(&cfg.TrustedSubnet, "t", "", "trusted subnet in CIDR")
+	flag.StringVar(&cfg.GRPCAddress, "grpc", "", "gRPC server address")
 
 	flag.Parse()
 
@@ -104,6 +109,11 @@ func InitConfig() *Config {
 			if jc.TrustedSubnet != "" {
 				cfg.TrustedSubnet = jc.TrustedSubnet
 			}
+
+			if jc.GRPCAddress != "" {
+				cfg.GRPCAddress = jc.GRPCAddress
+			}
+
 		}
 	}
 
@@ -135,6 +145,10 @@ func InitConfig() *Config {
 
 	if v := os.Getenv("TRUSTED_SUBNET"); v != "" {
 		cfg.TrustedSubnet = v
+	}
+
+	if v := os.Getenv("GRPC_ADDRESS"); v != "" {
+		cfg.GRPCAddress = v
 	}
 
 	// --- FLAGS (самый высокий приоритет) ---

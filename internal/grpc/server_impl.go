@@ -20,7 +20,7 @@ type GRPCServer struct {
 }
 
 // NewGRPCServer создает gRPC сервер с фасадом
-func NewGRPCServer(store storage.Storage, authMgr interface{}, logger *zap.Logger) *GRPCServer {
+func NewGRPCServer(store storage.Storage, logger *zap.Logger) *GRPCServer {
 	facade := service.NewShortenerFacade(store)
 	return &GRPCServer{facade: facade, logger: logger}
 }

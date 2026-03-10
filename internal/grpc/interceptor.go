@@ -15,7 +15,7 @@ import (
 
 var ErrUnauthenticated = errors.New("unauthenticated")
 
-// AuthInterceptor создает unary interceptor для проверки токена Authorization.
+// AuthUnaryInterceptor создает unary interceptor для проверки токена Authorization.
 // Все gRPC вызовы будут проверять заголовок "authorization".
 // Если токен валиден, userID сохраняется в контекст для дальнейшего использования.
 func AuthUnaryInterceptor(am *auth.Manager, logger *zap.Logger) grpc.UnaryServerInterceptor {
