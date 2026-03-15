@@ -122,3 +122,31 @@ func (s *InMemoryStorage) MarkDeleted(userID string, shorts []string) error {
 	}
 	return nil
 }
+
+// URLsCount возвращает общее количество сокращённых URL,
+// сохранённых в in-memory хранилище.
+//
+// Метод потокобезопасен и использует RLock для чтения данных.
+//
+// Возвращает:
+//   - int: количество записей URL в хранилище.
+func (s *InMemoryStorage) URLsCount() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return len(s.data)
+}
+
+// UsersCount возвращает количество пользователей,
+// имеющих хотя бы один сохранённый URL в in-memory хранилище.
+//
+// Метод потокобезопасен и использует RLock для чтения данных.
+//
+// Возвращает:
+//   - int: количество уникальных пользователей.
+func (s *InMemoryStorage) UsersCount() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return len(s.userURLs)
+}

@@ -51,4 +51,7 @@ type Storage interface {
 
 	// MarkDeleted помечает список URL как удалённые для указанного пользователя.
 	MarkDeleted(userID string, shorts []string) error
+
+	URLsCount() int
+	UsersCount() int
 }

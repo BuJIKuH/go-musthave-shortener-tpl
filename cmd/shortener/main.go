@@ -10,6 +10,7 @@ import (
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/audit"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/auth"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/config"
+	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/grpc"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/handler"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/middleware"
 	"github.com/BuJIKuH/go-musthave-shortener-tpl/internal/service"
@@ -50,7 +51,10 @@ func main() {
 			NewDeleter,
 			NewAuditService,
 		),
-		fx.Invoke(startServer),
+		fx.Invoke(
+			startServer,
+			grpcserver.RunGRPCServer,
+		),
 	)
 
 	app.Run()
@@ -150,6 +154,8 @@ func newRouter(
 	r.POST("/api/shorten/batch", handler.PostBatchURL(store, cfg.ShortenAddress))
 	r.GET("/api/user/urls", handler.GetUserURLs(store, cfg.ShortenAddress))
 	r.DELETE("/api/user/urls", handler.DeleteUserURLs(store, deleter))
+
+	r.GET("/api/internal/stats", handler.GetStats(store, cfg))
 
 	return r
 }
